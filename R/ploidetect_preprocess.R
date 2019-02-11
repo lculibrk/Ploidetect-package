@@ -1,4 +1,4 @@
-ploidetect_preprocess <- function(input, normal = 2, tumour = 1, avg_allele_freq = 3, window_id = 4, window_size = 5, GC = 6, debugPlots = F, verbose = F){
+ploidetect_preprocess <- function(all_data, normal = 2, tumour = 1, avg_allele_freq = 3, window_id = 4, window_size = 5, GC = 6, debugPlots = F, verbose = F){
   if(verbose){
     print("Ploidetect - Detection of tumour purity and aneuploidy from whole-genome sequence data")
     print("Thank you for using Ploidetect! Please remember to cite this tool if used in your research ^_^")

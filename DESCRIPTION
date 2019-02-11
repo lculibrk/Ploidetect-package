@@ -13,3 +13,4 @@ Imports:
 	igraph,
 	limma,
 	kedd
+RoxygenNote: 6.1.1
