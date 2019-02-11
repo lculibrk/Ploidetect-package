@@ -1,7 +1,7 @@
 #' @export
 ploidetect <- function(all_data, normal = 2, tumour = 1, avg_allele_freq = 3, window_id = 4, window_size=5, GC = 6, limited = F, top = Inf, plots = F, verbose = F, nomaf = F, bw = 800, lowest = NA, runCNAs = F, comp=NA, cndiff=NA, segmentation_threshold = 0.75, CNA_call = F){
   ## Run ploidetect_preprocess
-  output <- ploidetect_preprocess(all_data, verbose = T, debugPlots = T, tumour = tumour, normal = normal, avg_allele_freq = avg_allele_freq, window_id = window_id, window_size = window_size, GC = GC)
+  output <- ploidetect_preprocess(all_data = all_data, verbose = verbose, debugPlots = T, tumour = tumour, normal = normal, avg_allele_freq = avg_allele_freq, window_id = window_id, window_size = window_size, GC = GC)
   
   ## Unpack the output list from ploidetect_preprocess
   maxpeak <- output$maxpeak
