@@ -10,9 +10,7 @@ LazyData: true
 Depends:
 	plyr,
 	dplyr,
-	igraph,
-	limma,
 	kedd,
-	ggplot2,
-	viridis
+	limma,
+	
 RoxygenNote: 6.1.1

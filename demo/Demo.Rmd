@@ -2,30 +2,84 @@
 title: "Ploidetect Example Case"
 author: "Luka"
 date: "2/11/2019"
-output: html_document
-  keep_md: true
+output: 
+  html_document:
+    keep_md: true
 ---
 
 ```{r setup, include=FALSE}
 library(devtools)
-install_github("lculibrk/Ploidetect-package")
+devtools::load_all(pkg = "../")
+#install_github("lculibrk/Ploidetect-package")
 library(Ploidetect)
 ```
 
 ## Data import
 
-First we import the requisite data, formatted as discussed on the README.md
+First we import the data, formatted as discussed on the README.md. This data is from COLO829, a triploid cell line
 
-```{r cars}
-dat <- read.table()
+```{r}
+dat <- read.table("exampledata.txt", stringsAsFactors = F, header = T)
+str(dat)
 ```
 
-## Including Plots
+## Running Ploidetect
 
-You can also embed plots, for example:
+Now we run Ploidetect by calling ```ploidetect()```, and supplying the indices for the columns in our data, and a "bw" argument which will be explained
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r, echo=FALSE}
+result <- ploidetect(all_data = dat, normal = 2, tumour = 1, avg_allele_freq = 3, window_id = 4, window_size = 5, GC = 6, verbose = F, bw = 400, CNA_call = F)
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+## Interpreting the results
+
+For interpreting the results, it is probably valuable to explain what all these plots mean. 
+
+Ploidetect will first give you one scatter plot. Each point in this scatter plot represents a single region of the genome. The X-axis of the scatterplot corresponds to the size of the genomic regions, as the data was generated using variable-size bins to correct for mappability biases. Therefore the value on the X axis is inversely proportional to the mappability of the region (since as mappability decreases, the size of the bin increases). The Y-axis of the scatterplot is the corrected depth of coverage of the tumour genome. 
+
+The density plots are a visual representation of Ploidetect's attempts at determining the tumour purity. They can be thought of as a smoothed histogram of the read depth. Generally we observe that the density plots show a few peaks, where each peak represents a cluster of genomic regions with a similar coverage. We assume that a bunch of regions with similar coverage means that those regions have the same copy number. Ploidetect tries to select a set of peaks that are regularly spaced, since the read depth difference between a 1-copy region and a 2-copy region should be the same as the difference between a 2-copy region and a 3-copy region. The first density plot shows where peaks have been called in the data. Each subsequent density plot is the result of Ploidetect selecting a set from those peaks to estimate the difference in coverage between integer copy numbers in the tumour genome.
+
+Let's look at the purity results for this case:
+```{r}
+(tc <- result$TC_calls)
+```
+
+These are the models that Ploidetect used to predict tumour purity in the sample. Given that this was a 100% pure sample, it did pretty well with 95.5%. But how do we make sure the results are fine? After all, a patient's health or an analysis could depend on it being correct.
+
+The first step is to take a look at the CN_diff and Comparator columns. These are used to identify the model that was chosen and match it up to the plots above (the density plots with titles "Model for CN_diff = # and Comparator = #"). 
+
+With the first row (best model) as an example, we see that Ploidetect chose 1 and 2, respectively. This means that it's using the #2 peak (measured by height) and assuming there is a copy number 1 difference between this and the highest peak. The corresponding plot indicates which peaks correspond to integer copy number states.
+
+For this plot, we observe that four peaks have been fitted (four vertical dashed lines), and one peak has not (at roughly 7500 depth). What this means is that Ploidetect decided that this peak is likely a technical artifact or a subclonal copy number change, which has been skipped in the model. This is exactly what we're looking for. In fact, there is no model which actually uses that peak, which is unfortunate, because that would have been a good example of a bad model (and now I have to find another example). 
+
+When you manually review Ploidetect's models, what you are looking for is fitting distinct, regularly spaced peaks. Here's an example where Ploidetect fails to get it right automatically. 
+
+```{r}
+dat <- read.table("../../coverage/POG496/binned/1/P01263_P01278_processed.bed", stringsAsFactors = F, header = T)
+str(dat)
+result_2 <- ploidetect(dat, normal = 2, tumour = 1, avg_allele_freq = 4, window_id = 3, window_size = 5, GC = 6, verbose = F, bw = 400)
+```
+
+```{r}
+(tc_2 <- result_2$TC_calls)
+```
+
+Wow. The read count data is an absolute mess! I wouldn't trust any depth-based tumour purity tool for this, including Ploidetect. Thankfully, Ploidetect gives us information to help us figure this one out manually.
+
+
+```{r}
+testMAF(3, 0.307)
+```
+So this is telling us that if the allele mixture was 2:1, we would see a MAF of 0.567, which is quite different from what we see. This is enough to tell us that this peak is likely due to subclones and therefore bad.
+
+So, which model do we select such that this peak is skipped? That would be the CN_diff = 1, Comparator = 4 model. In this case, there would be a CN=1 peak with MAF of 0.651 at purity 46.8%. Let's test it
+
+```{r}
+testMAF(1, 0.468)
+```
+
+Pretty much right on the money. The CN=3 peak appears to be mixing with a subclone in this model, so let's evaluate the CN=4 peak just to be sure
+
+```{r}
+testMAF(4, 0.468)
+```

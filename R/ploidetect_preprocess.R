@@ -28,11 +28,10 @@ ploidetect_preprocess <- function(all_data, normal = 2, tumour = 1, avg_allele_f
   
   ## Filter for chr1-22 and X for this stage of modeling
   x <- x[grepl(pattern = paste0(c(paste0("^", 1:22), "^X"), "_", collapse = "|"), x = x[,window_id]),]
-  
-  
+   
   ## Set row names to window_ids
   row.names(x) <- as.data.frame(x)[,window_id]
-  
+
   ## Perform basic pre-filtering, find the windows within the 90th percentile of tumour read counts
   rangedf <- x[findInterval(x[,tumour], 
                             quantile(x[,tumour], 
@@ -66,15 +65,14 @@ ploidetect_preprocess <- function(all_data, normal = 2, tumour = 1, avg_allele_f
       print("Automated sex detection infers FEMALE sex")
     }
   }
-  
+
   ## This is a very broad-strokes filtering step for window size. Basically removing extreme outliers w.r.t germline mappability, as we don't want to use these in modeling
-  x <- x[(x[,window_size] > (median(x[,window_size])/10)) & (x$V5 < (median(x[,window_size])*5)),]
+  x <- x[(x[,window_size] > (median(x[,window_size])/10)) & (x[,window_size] < (median(x[,window_size])*5)),]
   
   
   x <- x[,c(tumour, normal, window_id, avg_allele_freq, window_size, GC)]
   names(x) <- c("y_raw", "x_raw", "window", "maf", "size", "GC")
 
-  print(str(x))
 
   if(debugPlots){
     rawPlot <- x %>% ggplot(aes(x = size, y = y_raw)) + geom_point(size = 0.1, alpha = 0.1) + xlab("Window size") + ylab("Tumour Read counts") + ggtitle("Raw counts by window size") + theme_minimal()
@@ -90,7 +88,7 @@ ploidetect_preprocess <- function(all_data, normal = 2, tumour = 1, avg_allele_f
   }
   
   ## Normalize for GC content
-  GCnorm <- loessFit(y = x$y_raw, x = x$GC, span = 0.1)
+  GCnorm <- loessFit(y = x$y_raw, x = x$GC, span = 0.3)
   
   ## Residuals of this model can be thought of as the normalized read counts, so scale them back to something resembling read counts
   GCnorm$residuals <- GCnorm$residuals + median(x$y_raw)
@@ -104,10 +102,6 @@ ploidetect_preprocess <- function(all_data, normal = 2, tumour = 1, avg_allele_f
       ggtitle("Non-linear normalization of read counts by GC content")
     print(GCnormplot)
   }
-  
-  ## Perform a linear model fit so as to get a linear transformation of the data w.r.t. the fitted values of the loess fit
-  
-  #GCnorm2 <- rlm(x$y_raw ~ GCnorm$fitted)
   
   ## Normalized final values: Linear-normalized read depth divided by expected response of the linear model, then scaled to a practical scale
   ## This scales the values such that they are linear (ie. removes any x~y relationship and ensures the variation is only in the y-axis)

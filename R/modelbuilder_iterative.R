@@ -1,4 +1,4 @@
-modelbuilder_iterative <- function(xdists = xdists, allPeaks = allPeaks, lowest, filtered = filtered, strict = T, get_homd = F, mode = "TC", nomaf = nomaf, rerun = rerun, maxpeak = maxpeak){
+modelbuilder_iterative <- function(xdists = xdists, allPeaks = allPeaks, lowest, filtered = filtered, strict = T, get_homd = F, mode = "TC", nomaf = nomaf, rerun = rerun, maxpeak = maxpeak,bw = bw){
   out <- list()
   if(!is.na(lowest)){
     lowestrange <- lowest
@@ -289,7 +289,7 @@ modelbuilder_iterative <- function(xdists = xdists, allPeaks = allPeaks, lowest,
                                                "avg_ploidy" = average_ploidy,
                                                "unmatchedpct" = unmatchederror))
   }
-  newden <- density(filtered$residual)
+  newden <- filtered$residual[which(filtered$residual < max(matchedPeaks$pos) + x)] %>% density()
   plot <- ggplot(mapping = aes(x = newden$x + maxpeak, y = (newden$y - min(newden$y))/(max(newden$y) - min(newden$y)))) + 
     geom_line() + 
     xlab("Read Counts") + 

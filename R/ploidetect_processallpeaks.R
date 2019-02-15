@@ -22,8 +22,16 @@ ploidetect_processallpeaks <- function(filtered, allPeaks, verbose = F){
   }
   allPeaks$mainmaf <- NA
   for(i in 1:nrow(allPeaks)){
-    if(length(na.omit(filterednomafna$maf[filterednomafna$peak == allPeaks$npeak[i]])) > 1){
-      md <- density(filterednomafna$mafflipped[filterednomafna$peak == allPeaks$npeak[i]], na.rm = T)
+    peakdata <- filterednomafna[filterednomafna$peak == allPeaks$npeak[i],]
+    if(nrow(peakdata) > 1){
+      peakdata <- filterednomafna[filterednomafna$peak == allPeaks$npeak[i],]
+      peakdata <- peakdata %>% filter(!is.na(residual))
+      position <- allPeaks$pos[i]
+      peakdata$dev <- peakdata$residual - position
+      peakdata <- peakdata %>% arrange(dev)
+      peakdata <- peakdata[1:max(c(round(nrow(peakdata)/10, digits = 0), 2)),]
+      print(max(c(round(nrow(peakdata)/10, digits = 0), 2)))
+      md <- density(peakdata$mafflipped, na.rm = T)
       allPeaks$mainmaf[i] <- md$x[which.max(md$y)]
     }else{
       allPeaks$mainmaf[i] <- NA

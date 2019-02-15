@@ -29,9 +29,11 @@ peakcaller <- function(filtered, bw = bw, verbose = F){
   }
   ## Get peak height
   newpeaks <- lapply(peaks, function(x){
-    c(x, 
-      height = max(den$y[findInterval(x = den$x, vec = unlist(x)) == 1]), 
-      pos = (den$x[(den$y == max(den$y[findInterval(x = den$x, vec = x[1:2]) == 1])) & (den$x >= x[1]) & (den$x) <= x[2]]))
+    if(length(den$y[findInterval(x = den$x, vec = unlist(x)) == 1]) > 0){
+      c(x, 
+        height = max(den$y[findInterval(x = den$x, vec = unlist(x)) == 1]), 
+        pos = (den$x[(den$y == max(den$y[findInterval(x = den$x, vec = x[1:2]) == 1])) & (den$x >= x[1]) & (den$x) <= x[2]]))
+    }
   })
   # Merge into a df, arrange
   allPeaks <- as.data.frame(do.call(rbind, newpeaks))

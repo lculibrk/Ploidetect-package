@@ -2,6 +2,7 @@ optimizesmoothing <- function(x, tumour = tumour, normal = normal, avg_allele_fr
   if(verbose){
     print("Beginning linear transformation step")
   }
+  return(0)
   if(is.null(bw)){
     stop("BW is not set!")
   }
@@ -48,7 +49,8 @@ optimizesmoothing <- function(x, tumour = tumour, normal = normal, avg_allele_fr
     print(paste0("Testing slope offset=",slope))
     bestsofar <- slopes[which.min(troughs)]
     slopes[i] <- slope
-    allPeaks <- peakcaller(linearTransform(x, tumour = tumour, normal = normal, avg_allele_freq = avg_allele_freq, window_id = window_id, slope = slope, verbose = F), bw)
+    transformedData <- linearTransform(x, tumour = tumour, normal = normal, avg_allele_freq = avg_allele_freq, window_id = window_id, slope = slope, verbose = F)
+    allPeaks <- peakcaller(transformedData, bw)
     troughs[i] <- allPeaks$meansig[1]
     slope <- mean(c(bestsofar, slope))
   }

@@ -1,7 +1,7 @@
 ploidetect_transform <- function(x, bw, normal = 2, tumour = 1, avg_allele_freq = 3, window_id = 4, window_size = 5, GC = 6, verbose = F){
   ## First linearTransform with slope 0
   filtered <- linearTransform(x, tumour = tumour, normal = normal, avg_allele_freq = avg_allele_freq, window_id = window_id, slope = 0, verbose = verbose)
-  ## Generate list of peaks called with transformation slope = 0 and heavy outlier filtering
+## Generate list of peaks called with transformation slope = 0 and heavy outlier filtering
   allPeaks <- peakcaller(filtered[findInterval(filtered$residual, vec = quantile(filtered$residual, probs = c(0.01, 0.99))) == 1,], bw)
   ## If we call zero peaks (due to poor bw, for example)
   if(nrow(allPeaks) == 1){
