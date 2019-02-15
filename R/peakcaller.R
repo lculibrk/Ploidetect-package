@@ -10,8 +10,8 @@ peakcaller <- function(filtered, bw = bw, verbose = F){
   den$y <- (den$y - min(den$y))/(max(den$y) - min(den$y))
   dendf <- data.frame(x = den$x, y = den$y, stringsAsFactors = F)
   # Take second derivative
-  ddx <- dkde(filtered$residual, deriv.order = 2, h = max((range(filtered$residual)[2] - range(filtered$residual)[1])/50, bw))
-  dx <- dkde(filtered$residual, deriv.order = 1, h = max((range(filtered$residual)[2] - range(filtered$residual)[1])/50, bw))
+  ddx <- dkde(filtered$residual, deriv.order = 2, h = bw)
+  dx <- dkde(filtered$residual, deriv.order = 1, h = bw)
   dx$est.fx <- abs(dx$est.fx)
   # Call peaks, essentially scan along ddx and find where it goes from negative to positive
   peaks <- list()

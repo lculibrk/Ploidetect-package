@@ -53,7 +53,7 @@ ploidetect <- function(all_data, normal = 2, tumour = 1, avg_allele_freq = 3, wi
     rerun=T
   }
   
-  xdists <- ploidetect_roughmodels(allPeaks = allPeaks, maxpeak, verbose = T, rerun = rerun)
+  xdists <- ploidetect_roughmodels(allPeaks = allPeaks, maxpeak, verbose = verbose, rerun = rerun)
   
   ## Can't really do much else if there's only one peak in the data, so we return a message explaining this and exit
   if(nrow(allPeaks) == 1){

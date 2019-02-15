@@ -8,6 +8,7 @@ ploidetect_processallpeaks <- function(filtered, allPeaks, verbose = F){
     interval <- unlist(c(allPeaks[i,c("start", "end")]))
     filtered$peak[findInterval(x = filtered$residual, vec = interval) == 1] <- allPeaks$npeak[i]
   }
+  plot(density(filtered$residual, na.rm = T))
   ## Filter data for only data with allelic frequency values
   filterednomafna <- filtered %>% filter(!is.na(mafflipped))
   ## Check to see if we have allelic frequency data
@@ -23,6 +24,7 @@ ploidetect_processallpeaks <- function(filtered, allPeaks, verbose = F){
   allPeaks$mainmaf <- NA
   for(i in 1:nrow(allPeaks)){
     peakdata <- filterednomafna[filterednomafna$peak == allPeaks$npeak[i],]
+    peakdata <- peakdata %>% filter(!is.na(mafflipped))
     if(nrow(peakdata) > 1){
       peakdata <- filterednomafna[filterednomafna$peak == allPeaks$npeak[i],]
       peakdata <- peakdata %>% filter(!is.na(residual))
@@ -30,7 +32,7 @@ ploidetect_processallpeaks <- function(filtered, allPeaks, verbose = F){
       peakdata$dev <- peakdata$residual - position
       peakdata <- peakdata %>% arrange(dev)
       peakdata <- peakdata[1:max(c(round(nrow(peakdata)/10, digits = 0), 2)),]
-      print(max(c(round(nrow(peakdata)/10, digits = 0), 2)))
+      print(str(peakdata))
       md <- density(peakdata$mafflipped, na.rm = T)
       allPeaks$mainmaf[i] <- md$x[which.max(md$y)]
     }else{

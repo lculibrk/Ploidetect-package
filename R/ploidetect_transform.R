@@ -27,7 +27,10 @@ ploidetect_transform <- function(x, bw, normal = 2, tumour = 1, avg_allele_freq 
   allPeaks$meansig <- NULL
   ## Center the residual and peak data about the tallest peak
   filtered$residual <- filtered$residual - allPeaks$pos[1]
+  allPeaks$start <- allPeaks$start - allPeaks$pos[1]
+  allPeaks$end <- allPeaks$end - allPeaks$pos[1]
   allPeaks$pos <- allPeaks$pos - allPeaks$pos[1]
+
   output <- list("filtered" = filtered, "allPeaks" = allPeaks)
   return(output)
 }
