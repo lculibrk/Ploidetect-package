@@ -32,7 +32,6 @@ ploidetect_processallpeaks <- function(filtered, allPeaks, verbose = F){
       peakdata$dev <- peakdata$residual - position
       peakdata <- peakdata %>% arrange(dev)
       peakdata <- peakdata[1:max(c(round(nrow(peakdata)/10, digits = 0), 2)),]
-      print(str(peakdata))
       md <- density(peakdata$mafflipped, na.rm = T)
       allPeaks$mainmaf[i] <- md$x[which.max(md$y)]
     }else{

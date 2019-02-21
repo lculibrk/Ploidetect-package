@@ -1,5 +1,6 @@
-modelbuilder_iterative <- function(xdists = xdists, allPeaks = allPeaks, lowest, filtered = filtered, strict = T, get_homd = F, mode = "TC", nomaf = nomaf, rerun = rerun, maxpeak = maxpeak,bw = bw){
+modelbuilder_iterative <- function(xdists = xdists, allPeaks = allPeaks, lowest = NA, filtered = filtered, strict = T, get_homd = F, mode = "TC", nomaf = nomaf, rerun = rerun, maxpeak = maxpeak,bw = bw){
   out <- list()
+  outplots <- list()
   if(!is.na(lowest)){
     lowestrange <- lowest
   }else{
@@ -298,7 +299,6 @@ modelbuilder_iterative <- function(xdists = xdists, allPeaks = allPeaks, lowest,
     geom_vline(aes(xintercept = fitpeaks), linetype = 2) + 
     geom_text(mapping = aes(x = allPeaks$pos, y = allPeaks$height + 0.05, label = paste0("MAF = ", round(allPeaks$mainmaf, digits = 3)))) +
     theme_bw(base_size = 12)
-  print(plot)
   out <- do.call(rbind.data.frame, out)
   if(nrow(out) > 1){
     out <- out[-which.max(out$mafdev),]
@@ -309,5 +309,5 @@ modelbuilder_iterative <- function(xdists = xdists, allPeaks = allPeaks, lowest,
     }
   }
   out <- out[which.min(out$mafdev),]
-  return(out)
+  return(list("out" = out, "outplot" = plot))
 }

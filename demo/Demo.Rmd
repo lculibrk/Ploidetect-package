@@ -52,16 +52,21 @@ With the first row (best model) as an example, we see that Ploidetect chose 1 an
 
 For this plot, we observe that four peaks have been fitted (four vertical dashed lines), and one peak has not (at roughly 7500 depth). What this means is that Ploidetect decided that this peak is likely a technical artifact or a subclonal copy number change, which has been skipped in the model. This is exactly what we're looking for. In fact, there is no model which actually uses that peak, which is unfortunate, because that would have been a good example of a bad model (and now I have to find another example). 
 
-When you manually review Ploidetect's models, what you are looking for is fitting distinct, regularly spaced peaks. Here's an example where Ploidetect fails to get it right automatically. 
+When you manually review Ploidetect's models, what you are looking for is fitting distinct, regularly spaced peaks. Here's an example where Ploidetect is close, but there is a better model which predicts a more reasonable tumour purity. 
 
 ```{r}
-dat <- read.table("../../coverage/POG496/binned/1/P01263_P01278_processed.bed", stringsAsFactors = F, header = T)
+dat <- read.table(Sys.glob("../../coverage/POG003/binned/1/*processed.bed")[1], stringsAsFactors = F, header = T)
 str(dat)
-result_2 <- ploidetect(dat, normal = 2, tumour = 1, avg_allele_freq = 4, window_id = 3, window_size = 5, GC = 6, verbose = F, bw = 400)
+devtools::load_all(pkg = "../")
+result_2 <- ploidetect(dat, normal = 2, tumour = 1, avg_allele_freq = 4, window_id = 3, window_size = 5, GC = 6, verbose = F, bw = 2000, CNA_call = F)
 ```
 
 ```{r}
 (tc_2 <- result_2$TC_calls)
+
+plots <- result_2$plots
+
+plots[[1]]
 ```
 
 Wow. The read count data is an absolute mess! I wouldn't trust any depth-based tumour purity tool for this, including Ploidetect. Thankfully, Ploidetect gives us information to help us figure this one out manually.
