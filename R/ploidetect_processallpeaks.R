@@ -8,7 +8,6 @@ ploidetect_processallpeaks <- function(filtered, allPeaks, verbose = F){
     interval <- unlist(c(allPeaks[i,c("start", "end")]))
     filtered$peak[findInterval(x = filtered$residual, vec = interval) == 1] <- allPeaks$npeak[i]
   }
-  plot(density(filtered$residual, na.rm = T))
   ## Filter data for only data with allelic frequency values
   filterednomafna <- filtered %>% filter(!is.na(mafflipped))
   ## Check to see if we have allelic frequency data
