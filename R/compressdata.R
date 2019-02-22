@@ -1,4 +1,4 @@
-compressdata <- function(t){
+compressdata <- function(t, x, segmentation_threshold = segmentation_threshold){
   # Arrange data by position
   t <- t %>% arrange(pos)
   # If this is the first iteration, set npoints to one (npoints records how many original vertices were compressed into one vertex)

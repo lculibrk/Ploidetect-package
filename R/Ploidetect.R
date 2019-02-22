@@ -1,11 +1,9 @@
 #' @export
-ploidetect <- function(all_data, normal = 2, tumour = 1, avg_allele_freq = 3, window_id = 4, window_size=5, GC = 6, limited = F, top = Inf, plots = F, verbose = F, nomaf = F, bw = 800, lowest = NA, runCNAs = F, comp=NA, cndiff=NA, segmentation_threshold = 0.75, CNA_call = F, debugPlots = F){
-  if(!is.numeric(bw)){
-    stop("Bandwidth must be numeric!")
-  }
+ploidetect <- function(all_data, normal = 2, tumour = 1, avg_allele_freq = 3, window_id = 4, window_size=5, GC = 6, plots = F, verbose = F, nomaf = F, lowest = NA, runCNAs = F, comp=NA, cndiff=NA, segmentation_threshold = 0.75, CNA_call = F, debugPlots = F){
+
   
   ## Run ploidetect_preprocess
-  
+
   output <- ploidetect_preprocess(all_data = all_data, verbose = verbose, debugPlots = debugPlots, tumour = tumour, normal = normal, avg_allele_freq = avg_allele_freq, window_id = window_id, window_size = window_size, GC = GC)
   
   ## Unpack the output list from ploidetect_preprocess
@@ -13,7 +11,7 @@ ploidetect <- function(all_data, normal = 2, tumour = 1, avg_allele_freq = 3, wi
   x <- output$x
   highoutliers <- output$highoutliers
   
-  bw = maxpeak/25
+  bw = maxpeak/40
   
   ## Run ploidetect_transform
   output <- ploidetect_transform(x, bw, verbose = verbose, tumour = tumour, normal = normal, avg_allele_freq = avg_allele_freq, window_id = window_id, window_size = window_size)
@@ -65,7 +63,7 @@ ploidetect <- function(all_data, normal = 2, tumour = 1, avg_allele_freq = 3, wi
   
   ## Can't really do much else if there's only one peak in the data, so we return a message explaining this and exit
   if(nrow(allPeaks) == 1){
-    return(xdists)
+    return(list("TC_calls" = xdists, "plots" = NA, "CN_calls" = NA))
   }
   
   ## Normalize allPeaks to maxPeak
@@ -95,7 +93,7 @@ ploidetect <- function(all_data, normal = 2, tumour = 1, avg_allele_freq = 3, wi
   
   plots <- plyr::compact(plots)
   
-  ordering <- order(TC_calls$newerr)
+  ordering <- order(TC_calls$model_error)
   
   TC_calls <- TC_calls[ordering,]
   
@@ -119,5 +117,5 @@ ploidetect <- function(all_data, normal = 2, tumour = 1, avg_allele_freq = 3, wi
   
   CN_calls <- ploidetect_segmentator(filtered, matchedPeaks, maxpeak, predictedpositions, highoutliers, depthdiff, avg_allele_freq = avg_allele_freq, window_size = window_size, window_id = window_id, tumour = tumour, segmentation_threshold = segmentation_threshold)
   
-  return(list("TC_calls" = TC_calls, "CN_calls" = CN_calls))
+  return(list("TC_calls" = TC_calls, "plots" = plots, "CN_calls" = CN_calls))
 }

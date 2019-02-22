@@ -277,16 +277,15 @@ modelbuilder_iterative <- function(xdists = xdists, allPeaks = allPeaks, lowest 
     if(strict & unmatchederror > 0.9){
       newerrors <- Inf
     }
-    out[paste0(lowestpeak)] <- list(data.frame("mappability-corrected_reads_per_copy" = x, 
-                                               "HOMD" = homd, 
+    out[paste0(lowestpeak)] <- list(data.frame("reads_per_copy" = x, 
+                                               "zero_copy_depth" = homd, 
                                                "Ploidy" = ploidy, 
-                                               "tc" = purity, 
-                                               "bottomsize" = sum(as.numeric(filtered$size[which(filtered$CN == 0)])), 
+                                               "tumour_purity" = purity, 
                                                "lowest_peak_CN" = lowestpeak, 
-                                               "mafdev" = as.numeric(mafdev[paste0(lowestpeak)]), 
+                                               "maf_error" = as.numeric(mafdev[paste0(lowestpeak)]), 
                                                "CN_diff" = xdists$Copy_number_difference_between_peaks, 
                                                "Comparator" = xdists$Comparator_peak_rank,
-                                               "newerr" = newerrors * as.numeric(mafdev[paste0(lowestpeak)]),
+                                               "model_error" = newerrors * as.numeric(mafdev[paste0(lowestpeak)]),
                                                "avg_ploidy" = average_ploidy,
                                                "unmatchedpct" = unmatchederror))
   }

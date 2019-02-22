@@ -55,10 +55,10 @@ For this plot, we observe that four peaks have been fitted (four vertical dashed
 When you manually review Ploidetect's models, what you are looking for is fitting distinct, regularly spaced peaks. Here's an example where Ploidetect is close, but there is a better model which predicts a more reasonable tumour purity. 
 
 ```{r}
-dat <- read.table(Sys.glob("../../coverage/POG003/binned/1/*processed.bed")[1], stringsAsFactors = F, header = T)
+dat <- read.table(Sys.glob("../../coverage/POG004/binned/1/*processed.bed")[1], stringsAsFactors = F, header = T)
 str(dat)
 devtools::load_all(pkg = "../")
-result_2 <- ploidetect(dat, normal = 2, tumour = 1, avg_allele_freq = 4, window_id = 3, window_size = 5, GC = 6, verbose = F, bw = 2000, CNA_call = F)
+result_2 <- ploidetect(dat, normal = 2, tumour = 1, avg_allele_freq = 4, window_id = 3, window_size = 5, GC = 6, verbose = F, CNA_call = F)
 ```
 
 ```{r}
