@@ -6,13 +6,13 @@ compressdata <- function(t, x, segmentation_threshold = segmentation_threshold){
     t$npoints <- 1
   }
   # Get differences between neighbouring points
-  diffs <- abs(diff(t$new_residual/t$npoints))
+  diffs <- abs(diff(t$residual/t$npoints))
   # Initialize graph from data
   graph <- graph(edges = c(row.names(t)[1], rep(row.names(t[-c(1, nrow(t)),]), each = 2), row.names(t)[nrow(t)]), directed = F)
   # Set edges to have the diffs attribute
   graph <- set_edge_attr(graph, name = "diff", value = diffs)
   # Give vertices appropriate attributes
-  graph <- set_vertex_attr(graph, name = "new_residual", value = t$new_residual)
+  graph <- set_vertex_attr(graph, name = "residual", value = t$residual)
   graph <- set_vertex_attr(graph, name = "npoints", value = t$npoints)
   graph <- set_vertex_attr(graph, name = "from", value = t$pos)
   graph <- set_vertex_attr(graph, name = "to", value = t$end)
@@ -57,11 +57,11 @@ compressdata <- function(t, x, segmentation_threshold = segmentation_threshold){
   
   # Merge connected vertices
   ### This is where the memory corruption usually happens
-  toy <- contract.vertices(toy, mapping = vertices, vertex.attr.comb = list("new_residual" = "sum", "npoints" = "sum", "from" = "min", "to" = "max", "first")) %>% simplify()
+  toy <- contract.vertices(toy, mapping = vertices, vertex.attr.comb = list("residual" = "sum", "npoints" = "sum", "from" = "min", "to" = "max", "first")) %>% simplify()
   # Delete all old vertices
   #toy <- delete.vertices(toy, which(names(V(toy)) == "character(0)"))
   # Reconstruct the data.frame we began with
-  dat <- data.frame("new_residual" = get.vertex.attribute(toy, "new_residual"), 
+  dat <- data.frame("residual" = get.vertex.attribute(toy, "residual"), 
                     "npoints" = get.vertex.attribute(toy, "npoints"), 
                     "pos" = get.vertex.attribute(toy, "from"),
                     "end" = get.vertex.attribute(toy, "to"))

@@ -88,11 +88,9 @@ modelbuilder_iterative <- function(xdists = xdists, allPeaks = allPeaks, lowest 
   #  next
   #}
   # If we have three peaks, filter out if have zero sequentials or if we have more than one ghost IF strict mode is enabled
-  if(nrow(allPeaks) == 3){
-    if(strict){
-      if((sum(as.numeric(sequential)) < 1) | (length(naindex) > 1)){
+  if(nrow(allPeaks) == 3 & strict){
+    if((sum(as.numeric(sequential)) < 1) | (length(naindex) > 1)){
         return()
-      }
     }
   }
   # Number of peaks
@@ -300,13 +298,13 @@ modelbuilder_iterative <- function(xdists = xdists, allPeaks = allPeaks, lowest 
     theme_bw(base_size = 12)
   out <- do.call(rbind.data.frame, out)
   if(nrow(out) > 1){
-    out <- out[-which.max(out$mafdev),]
+    out <- out[-which.max(out$maf_error),]
   }
   if(all(out$Ploidy %% 2 == 0)){
     for(level in out$lowest_peak_CN){
-      out$mafdev[which(out$lowest_peak_CN == level)] <- as.numeric(mafdeveven[paste0(level)])
+      out$maf_error[which(out$lowest_peak_CN == level)] <- as.numeric(mafdeveven[paste0(level)])
     }
   }
-  out <- out[which.min(out$mafdev),]
+  out <- out[which.min(out$maf_error),]
   return(list("out" = out, "outplot" = plot))
 }

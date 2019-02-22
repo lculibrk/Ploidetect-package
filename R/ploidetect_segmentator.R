@@ -47,7 +47,7 @@ ploidetect_segmentator <- function(filtered, matchedPeaks, maxpeak, predictedpos
   compressedalldat <- lapply(datsplit, runiterativecompression, x = depthdiff, segmentation_threshold = segmentation_threshold)
   ## Change generate a "median_segment" column for median coverage per segment
   compressedalldat <- lapply(compressedalldat, function(x){
-    x <- x %>% group_by(segment) %>% mutate("median_segment" = median(residual))
+    x <- x %>% group_by(segment) %>% dplyr::mutate("median_segment" = median(residual))
   })
   if(verbose){
     print("Calling copy numbers for each segment")

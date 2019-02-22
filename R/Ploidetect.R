@@ -79,6 +79,7 @@ ploidetect <- function(all_data, normal = 2, tumour = 1, avg_allele_freq = 3, wi
     stop("You are trying to force models which do not exist! Check the model information you entered and try again")
   }
   
+  
   TC_calls <- list()
   plots <- list()
   for(i in 1:nrow(xdists)){
@@ -90,6 +91,23 @@ ploidetect <- function(all_data, normal = 2, tumour = 1, avg_allele_freq = 3, wi
   #TC_calls <- lapply(xdists, function(x) modelbuilder_iterative(xdists = x, allPeaks = allPeaks, lowest = NA, filtered = filtered, strict = T, get_homd = F, mode = "TC", nomaf = nomaf, rerun = rerun, maxpeak = maxpeak, bw = bw))
   
   TC_calls <- do.call(rbind.data.frame, TC_calls)
+  
+  if(nrow(TC_calls) == 0){
+    TC_calls <- list()
+    plots <- list()
+    for(i in 1:nrow(xdists)){
+      modelbuilder_output <- modelbuilder_iterative(xdists[i,], allPeaks = allPeaks, lowest = NA, filtered = filtered, strict = F, get_homd = F, mode = "TC", nomaf = nomaf, rerun = rerun, maxpeak = maxpeak, bw = bw)
+      TC_calls <- c(TC_calls, list(modelbuilder_output$out))
+      plots <- c(plots, list(modelbuilder_output$outplot))
+    }
+    TC_calls <- do.call(rbind.data.frame, TC_calls)
+  }
+  
+  print(TC_calls)
+  
+  if(length(TC_calls) == 1){
+    return(list("TC_calls" = TC_calls, "plots" = plots, "CN_calls" = NULL))
+  }
   
   plots <- plyr::compact(plots)
   
@@ -116,6 +134,14 @@ ploidetect <- function(all_data, normal = 2, tumour = 1, avg_allele_freq = 3, wi
   depthdiff <- output$depthdiff
   
   CN_calls <- ploidetect_segmentator(filtered, matchedPeaks, maxpeak, predictedpositions, highoutliers, depthdiff, avg_allele_freq = avg_allele_freq, window_size = window_size, window_id = window_id, tumour = tumour, segmentation_threshold = segmentation_threshold)
+  
+  result_segments <- CN_calls %>% group_by(chr, segment) %>% dplyr::summarise(pos = min(pos), end = max(end), residual = median(residual))
+  
+  segmentation_plot <- ggplot(CN_calls, aes(x = pos, y = raw_residual + maxpeak)) + geom_point(size = 0.5) + scale_color_viridis() + geom_segment(data = result_segments, mapping = aes(y = residual, yend = residual, x = pos, xend = end), size = 1, color = "red") + facet_wrap(~chr, ncol = 3) + ggtitle("Segmentation results")
+
+  CNA_plot <- ggplot(CN_calls, aes(x = pos, y = raw_residual + maxpeak, color = CN)) + geom_point(size = 0.5) + scale_color_viridis() + facet_wrap(~chr, ncol = 3) + ggtitle("Copy number profile")
+
+  plots <- c(plots, segmentation_plot, CNA_plot)
   
   return(list("TC_calls" = TC_calls, "plots" = plots, "CN_calls" = CN_calls))
 }
