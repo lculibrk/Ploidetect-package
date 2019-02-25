@@ -32,6 +32,15 @@ ploidetect_preprocess <- function(all_data, normal = 2, tumour = 1, avg_allele_f
   ## Set row names to window_ids
   row.names(x) <- as.data.frame(x)[,window_id]
 
+  ## Get median normal coverage
+  median_normal <- median(x[,normal])
+  
+  norm_factor <- x[,normal]/median_normal
+  
+  x[,tumour] <- x[,tumour]/norm_factor
+  
+
+  
   ## Perform basic pre-filtering, find the windows within the 90th percentile of tumour read counts
   rangedf <- x[findInterval(x[,tumour], 
                             quantile(x[,tumour], 
@@ -72,8 +81,7 @@ ploidetect_preprocess <- function(all_data, normal = 2, tumour = 1, avg_allele_f
   
   x <- x[,c(tumour, normal, window_id, avg_allele_freq, window_size, GC)]
   names(x) <- c("y_raw", "x_raw", "window", "maf", "size", "GC")
-
-
+  
   if(debugPlots){
     rawPlot <- x %>% ggplot(aes(x = size, y = y_raw)) + geom_point(size = 0.1, alpha = 0.1) + xlab("Window size") + ylab("Tumour Read counts") + ggtitle("Raw counts by window size") + theme_minimal()
     print(rawPlot)

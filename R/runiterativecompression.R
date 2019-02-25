@@ -7,7 +7,7 @@ runiterativecompression <- function(t, x, segmentation_threshold = segmentation_
   while(!converged){
     windows <- nrow(compress)
     compress <- compressdata(compress, x, segmentation_threshold)
-    if(nrow(compress) == windows){
+    if(nrow(compress) == windows | nrow(compress) == 1){
       converged <- T
     }
   }

@@ -83,7 +83,7 @@ ploidetect <- function(all_data, normal = 2, tumour = 1, avg_allele_freq = 3, wi
   TC_calls <- list()
   plots <- list()
   for(i in 1:nrow(xdists)){
-    modelbuilder_output <- modelbuilder_iterative(xdists[i,], allPeaks = allPeaks, lowest = NA, filtered = filtered, strict = T, get_homd = F, mode = "TC", nomaf = nomaf, rerun = rerun, maxpeak = maxpeak, bw = bw)
+    modelbuilder_output <- modelbuilder_iterative(xdists[i,], allPeaks = allPeaks, lowest = lowest, filtered = filtered, strict = T, get_homd = F, mode = "TC", nomaf = nomaf, rerun = rerun, maxpeak = maxpeak, bw = bw)
     TC_calls <- c(TC_calls, list(modelbuilder_output$out))
     plots <- c(plots, list(modelbuilder_output$outplot))
   }
@@ -96,14 +96,12 @@ ploidetect <- function(all_data, normal = 2, tumour = 1, avg_allele_freq = 3, wi
     TC_calls <- list()
     plots <- list()
     for(i in 1:nrow(xdists)){
-      modelbuilder_output <- modelbuilder_iterative(xdists[i,], allPeaks = allPeaks, lowest = NA, filtered = filtered, strict = F, get_homd = F, mode = "TC", nomaf = nomaf, rerun = rerun, maxpeak = maxpeak, bw = bw)
+      modelbuilder_output <- modelbuilder_iterative(xdists[i,], allPeaks = allPeaks, lowest = lowest, filtered = filtered, strict = F, get_homd = F, mode = "TC", nomaf = nomaf, rerun = rerun, maxpeak = maxpeak, bw = bw)
       TC_calls <- c(TC_calls, list(modelbuilder_output$out))
       plots <- c(plots, list(modelbuilder_output$outplot))
     }
     TC_calls <- do.call(rbind.data.frame, TC_calls)
   }
-  
-  print(TC_calls)
   
   if(length(TC_calls) == 1){
     return(list("TC_calls" = TC_calls, "plots" = plots, "CN_calls" = NULL))
@@ -141,7 +139,7 @@ ploidetect <- function(all_data, normal = 2, tumour = 1, avg_allele_freq = 3, wi
 
   CNA_plot <- ggplot(CN_calls, aes(x = pos, y = raw_residual + maxpeak, color = CN)) + geom_point(size = 0.5) + scale_color_viridis() + facet_wrap(~chr, ncol = 3) + ggtitle("Copy number profile")
 
-  plots <- c(plots, segmentation_plot, CNA_plot)
+  plots <- c(plots, list(segmentation_plot), list(CNA_plot))
   
   return(list("TC_calls" = TC_calls, "plots" = plots, "CN_calls" = CN_calls))
 }
