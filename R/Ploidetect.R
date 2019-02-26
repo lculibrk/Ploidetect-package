@@ -24,7 +24,7 @@ ploidetect <- function(all_data, normal = 2, tumour = 1, avg_allele_freq = 3, wi
   
   ## Unpack the output list from processallpeaks
   filtered <- output$filtered
-  allPeaks <- output$allPeaks
+  allPeaks <- output$allPeaks %>% filter(pos + maxpeak > 0)
   nomaf <- output$nomaf
   ## Generate coverage plots for interpretation
   

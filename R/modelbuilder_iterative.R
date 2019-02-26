@@ -249,9 +249,9 @@ modelbuilder_iterative <- function(xdists = xdists, allPeaks = allPeaks, lowest 
     if(!is.na(purity)){
       if(purity > 1.1 | purity < 0){
         mafdev[paste0(lowestpeak)] <- Inf
-        if(rerun){
-          stop("You are trying to force a model which would result in TC > 110% or lower than 0%")
-        }
+        #if(rerun){
+        #  stop("You are trying to force a model which would result in TC > 110% or lower than 0%")
+        #}
       }
       
     }
@@ -287,15 +287,6 @@ modelbuilder_iterative <- function(xdists = xdists, allPeaks = allPeaks, lowest 
                                                "avg_ploidy" = average_ploidy,
                                                "unmatchedpct" = unmatchederror))
   }
-  newden <- filtered$residual[which(filtered$residual < max(matchedPeaks$pos) + x)] %>% density()
-  plot <- ggplot(mapping = aes(x = newden$x + maxpeak, y = (newden$y - min(newden$y))/(max(newden$y) - min(newden$y)))) + 
-    geom_line() + 
-    xlab("Read Counts") + 
-    ylab("Normalized Density") + 
-    ggtitle(paste0("Model for \"CN_diff\" = ", xdists$Copy_number_difference_between_peaks, ",\"comparator\" = ", xdists$Comparator_peak_rank)) + 
-    geom_vline(aes(xintercept = fitpeaks), linetype = 2) + 
-    geom_text(mapping = aes(x = allPeaks$pos, y = allPeaks$height + 0.05, label = paste0("MAF = ", round(allPeaks$mainmaf, digits = 3)))) +
-    theme_bw(base_size = 12)
   out <- do.call(rbind.data.frame, out)
   if(nrow(out) > 1){
     out <- out[-which.max(out$maf_error),]
@@ -306,5 +297,35 @@ modelbuilder_iterative <- function(xdists = xdists, allPeaks = allPeaks, lowest 
     }
   }
   out <- out[which.min(out$maf_error),]
+  
+  fitpeaks <- fitpeaks[fitpeaks > 0]
+  color_frame <- data.frame("positions" = fitpeaks, "col" = "#ED553B", stringsAsFactors = F)
+  matchedPeaks$CN <- seq(from = out$lowest_peak_CN[1], length.out = nrow(matchedPeaks))
+  matchedPeaks <- matchedPeaks %>% arrange(pos)
+  for(i in 1:nrow(matchedPeaks)){
+    if(matchedPeaks$CN[i] == 0){
+      color_frame$col[i] <- "#000000"
+    }else if(matchedPeaks$CN[i] == 1){
+      color_frame$col[i] <- "#00245e"
+    }else if(matchedPeaks$CN[i] == 2){
+      color_frame$col[i] <- "#25ba00"
+    }else if(matchedPeaks$CN[i] == 3){
+      color_frame$col[i] <- "#F6D55C"
+    }else{
+      color_frame$col[i] <- "#ED553B"
+    }
+  }
+  
+  newden <- filtered$residual[which(filtered$residual < max(matchedPeaks$pos) + x)] %>% density()
+  plot <- ggplot(mapping = aes(x = newden$x + maxpeak, y = (newden$y - min(newden$y))/(max(newden$y) - min(newden$y)))) + 
+    geom_line() + 
+    xlab("Read Counts") + 
+    ylab("Normalized Density") + 
+    ggtitle(paste0("Model for \"CN_diff\" = ", xdists$Copy_number_difference_between_peaks, ",\"comparator\" = ", xdists$Comparator_peak_rank)) + 
+    geom_vline(data = color_frame, aes(xintercept = positions, color = factor(1:nrow(color_frame))), linetype = 2) + 
+    geom_text(mapping = aes(x = allPeaks$pos, y = allPeaks$height + 0.05, label = paste0("MAF = ", round(allPeaks$mainmaf, digits = 3)))) +
+    theme_bw(base_size = 12) + 
+    scale_color_manual(values = color_frame$col, labels = paste0("CN = ", matchedPeaks$CN), name = "Absolute copy number") #+ theme(legend.position = "none")
+  
   return(list("out" = out, "outplot" = plot))
 }
