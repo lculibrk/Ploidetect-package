@@ -1,4 +1,5 @@
 modelbuilder_iterative <- function(xdists = xdists, allPeaks = allPeaks, lowest = NA, filtered = filtered, strict = T, get_homd = F, mode = "TC", nomaf = nomaf, rerun = rerun, maxpeak = maxpeak,bw = bw){
+
   out <- list()
   outplots <- list()
   if(!is.na(lowest)){
@@ -93,6 +94,7 @@ modelbuilder_iterative <- function(xdists = xdists, allPeaks = allPeaks, lowest 
         return()
     }
   }
+
   # Number of peaks
   npeaks <- nrow(matchedPeaks)
   
@@ -287,7 +289,9 @@ modelbuilder_iterative <- function(xdists = xdists, allPeaks = allPeaks, lowest 
                                                "avg_ploidy" = average_ploidy,
                                                "unmatchedpct" = unmatchederror))
   }
+
   out <- do.call(rbind.data.frame, out)
+
   if(nrow(out) > 1){
     out <- out[-which.max(out$maf_error),]
   }
@@ -300,9 +304,11 @@ modelbuilder_iterative <- function(xdists = xdists, allPeaks = allPeaks, lowest 
   
   fitpeaks <- fitpeaks[fitpeaks > 0]
   color_frame <- data.frame("positions" = fitpeaks, "col" = "#ED553B", stringsAsFactors = F)
+  matchedPeaks <- matchedPeaks %>% filter(!is.na(start))
   matchedPeaks$CN <- seq(from = out$lowest_peak_CN[1], length.out = nrow(matchedPeaks))
   matchedPeaks <- matchedPeaks %>% arrange(pos)
   for(i in 1:nrow(matchedPeaks)){
+    print(i)
     if(matchedPeaks$CN[i] == 0){
       color_frame$col[i] <- "#000000"
     }else if(matchedPeaks$CN[i] == 1){
@@ -315,8 +321,8 @@ modelbuilder_iterative <- function(xdists = xdists, allPeaks = allPeaks, lowest 
       color_frame$col[i] <- "#ED553B"
     }
   }
-  
   newden <- filtered$residual[which(filtered$residual < max(matchedPeaks$pos) + x)] %>% density()
+
   plot <- ggplot(mapping = aes(x = newden$x + maxpeak, y = (newden$y - min(newden$y))/(max(newden$y) - min(newden$y)))) + 
     geom_line() + 
     xlab("Read Counts") + 
@@ -326,6 +332,7 @@ modelbuilder_iterative <- function(xdists = xdists, allPeaks = allPeaks, lowest 
     geom_text(mapping = aes(x = allPeaks$pos, y = allPeaks$height + 0.05, label = paste0("MAF = ", round(allPeaks$mainmaf, digits = 3)))) +
     theme_bw(base_size = 12) + 
     scale_color_manual(values = color_frame$col, labels = paste0("CN = ", matchedPeaks$CN), name = "Absolute copy number") #+ theme(legend.position = "none")
-  
+
+  t <- list("out" = out, "outplot" = plot)
   return(list("out" = out, "outplot" = plot))
 }

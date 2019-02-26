@@ -86,10 +86,11 @@ ploidetect <- function(all_data, normal = 2, tumour = 1, avg_allele_freq = 3, wi
     modelbuilder_output <- modelbuilder_iterative(xdists[i,], allPeaks = allPeaks, lowest = lowest, filtered = filtered, strict = T, get_homd = F, mode = "TC", nomaf = nomaf, rerun = rerun, maxpeak = maxpeak, bw = bw)
     TC_calls <- c(TC_calls, list(modelbuilder_output$out))
     plots <- c(plots, list(modelbuilder_output$outplot))
+
   }
 
   #TC_calls <- lapply(xdists, function(x) modelbuilder_iterative(xdists = x, allPeaks = allPeaks, lowest = NA, filtered = filtered, strict = T, get_homd = F, mode = "TC", nomaf = nomaf, rerun = rerun, maxpeak = maxpeak, bw = bw))
-  
+
   TC_calls <- do.call(rbind.data.frame, TC_calls)
   
   if(nrow(TC_calls) == 0){
@@ -97,8 +98,11 @@ ploidetect <- function(all_data, normal = 2, tumour = 1, avg_allele_freq = 3, wi
     plots <- list()
     for(i in 1:nrow(xdists)){
       modelbuilder_output <- modelbuilder_iterative(xdists[i,], allPeaks = allPeaks, lowest = lowest, filtered = filtered, strict = F, get_homd = F, mode = "TC", nomaf = nomaf, rerun = rerun, maxpeak = maxpeak, bw = bw)
+
       TC_calls <- c(TC_calls, list(modelbuilder_output$out))
+
       plots <- c(plots, list(modelbuilder_output$outplot))
+
     }
     TC_calls <- do.call(rbind.data.frame, TC_calls)
   }
