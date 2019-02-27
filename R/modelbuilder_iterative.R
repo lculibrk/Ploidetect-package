@@ -243,10 +243,10 @@ modelbuilder_iterative <- function(xdists = xdists, allPeaks = allPeaks, lowest 
     mafdev[paste0(lowestpeak)] <- mean(toterr)
     lowestsize <- matchedPeaks$height[1]
     mafdeveven[paste0(lowestpeak)] <- mean(toterr)*(1+(max(ploidy-2, 0)*(1-lowestsize)))
-    if(any(matchedPeaks$mafdeviation > 0.15)){
-      newerrors <- Inf
-      mafdev[paste0(lowestpeak)] <- Inf
-    }
+    #if(any(matchedPeaks$mafdeviation > 0.15)){
+    #  newerrors <- Inf
+    #  mafdev[paste0(lowestpeak)] <- Inf
+    #}
     # If tc<1.1 or < 0 then set mafdev to Inf (this is an impossible model) (1.1 to allow slight inaccuracies)
     if(!is.na(purity)){
       if(purity > 1.1 | purity < 0){
@@ -255,7 +255,6 @@ modelbuilder_iterative <- function(xdists = xdists, allPeaks = allPeaks, lowest 
         #  stop("You are trying to force a model which would result in TC > 110% or lower than 0%")
         #}
       }
-      
     }
     #if we have a case of ridiculous by-chance fit with peak skipping (< 10^-8 works well), filter out
     if((unmatchederror > 0 & newerrors < 10^-8 & newerrors > 0)){
@@ -291,7 +290,7 @@ modelbuilder_iterative <- function(xdists = xdists, allPeaks = allPeaks, lowest 
   }
 
   out <- do.call(rbind.data.frame, out)
-
+  print(out)
   if(nrow(out) > 1){
     out <- out[-which.max(out$maf_error),]
   }
@@ -302,13 +301,12 @@ modelbuilder_iterative <- function(xdists = xdists, allPeaks = allPeaks, lowest 
   }
   out <- out[which.min(out$maf_error),]
   
-  fitpeaks <- fitpeaks[fitpeaks > 0]
+  #fitpeaks <- fitpeaks[fitpeaks > 0]
   color_frame <- data.frame("positions" = fitpeaks, "col" = "#ED553B", stringsAsFactors = F)
   matchedPeaks <- matchedPeaks %>% filter(!is.na(start))
   matchedPeaks$CN <- seq(from = out$lowest_peak_CN[1], length.out = nrow(matchedPeaks))
   matchedPeaks <- matchedPeaks %>% arrange(pos)
   for(i in 1:nrow(matchedPeaks)){
-    print(i)
     if(matchedPeaks$CN[i] == 0){
       color_frame$col[i] <- "#000000"
     }else if(matchedPeaks$CN[i] == 1){
