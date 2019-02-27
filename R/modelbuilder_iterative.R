@@ -290,7 +290,6 @@ modelbuilder_iterative <- function(xdists = xdists, allPeaks = allPeaks, lowest 
   }
 
   out <- do.call(rbind.data.frame, out)
-  print(out)
   if(nrow(out) > 1){
     out <- out[-which.max(out$maf_error),]
   }
