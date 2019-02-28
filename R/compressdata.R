@@ -46,7 +46,6 @@ compressdata <- function(t, x, segmentation_threshold = segmentation_threshold){
   # Change pairs of vertices to repeat the same vertex twice (used in contract.vertices() to map which vertices to contract)
   vertices[which(vertices %in% tomerge[,2])] <- tomerge[,1]
   mode(vertices) <- "integer"
-  print(str(vertices))
   lint <- vertices[1]
   for(i in 2:length(vertices)){
     if(vertices[i] - 1 > lint){

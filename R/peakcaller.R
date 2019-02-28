@@ -5,10 +5,9 @@ peakcaller <- function(filtered, bw = bw, verbose = F){
   # Filter out all regions without a MAF call
   filterednomafna <- filtered %>% filter(!is.na(maf))
   # Density estimate
-  den <- density(filtered$residual, n = nrow(filtered))
+  den <- density(filtered$residual, n = nrow(filtered), bw = bw)
   ## Normalize the density to 0->1 range
   den$y <- (den$y - min(den$y))/(max(den$y) - min(den$y))
-  dendf <- data.frame(x = den$x, y = den$y, stringsAsFactors = F)
   # Take second derivative
   ddx <- dkde(filtered$residual, deriv.order = 2, h = bw)
   dx <- dkde(filtered$residual, deriv.order = 1, h = bw)
@@ -66,6 +65,5 @@ peakcaller <- function(filtered, bw = bw, verbose = F){
   if(nrow(allPeaks %>% filter(ratiotrough < 1)) == 1){
     allPeaks <- allPeaks %>% filter(ratiotrough < 1)
   }
-  allPeaks$meansig <- -max(dx$est.fx)
   return(allPeaks)
 }

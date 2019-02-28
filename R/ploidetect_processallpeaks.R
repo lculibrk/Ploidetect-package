@@ -2,6 +2,8 @@ ploidetect_processallpeaks <- function(filtered, allPeaks, verbose = F){
   ## Assign IDs to each peak
   allPeaks <- allPeaks %>% arrange(pos) %>% mutate(npeak = seq(1, nrow(allPeaks))) %>% arrange(desc(height))
   
+  filtered$mafflipped[filtered$maf != "."] <- as.numeric(filtered$maf[filtered$maf != "."])
+  filtered$mafflipped <- abs(filtered$mafflipped - 0.5)+0.5
   ## Map peaks to data
   filtered$peak <- NA
   for(i in 1:nrow(allPeaks)){

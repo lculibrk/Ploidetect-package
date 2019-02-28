@@ -229,5 +229,33 @@ Eyeballing it gives us 31% purity, and Ploidetect predicted 39%.
 However, determining the depth of a homozygous deletion may be challenging the case of a messy genome. Notably, in cases of subclonal copy number variation, not all peaks in the density histogram correspond to integer copy number states. In these cases, it is challenging to estimate the depth difference between different integer copy number states. To illustrate this, here's another metastatic tumour, however this one contains subclonal copy number variation, and we'll go through Ploidetect's process to explain how it manages to determine the purity of this biopsy.
 
 ``` r
-knitr::knit_exit()
+clonalcase <- read.table("clonal_example.txt", sep = "\t", header = T, stringsAsFactors = F)
+str(clonalcase)
+```
+
+    ## 'data.frame':    152304 obs. of  6 variables:
+    ##  $ V4    : int  14334 16122 26613 16676 16590 16570 16715 16624 16854 17290 ...
+    ##  $ V5    : int  1000002 1000034 1000005 1000021 1000004 1000017 1000019 1000008 1000020 1000011 ...
+    ##  $ V6    : chr  "." "." "." "." ...
+    ##  $ window: chr  "1_0" "1_126577" "1_536971" "1_600543" ...
+    ##  $ size  : int  126577 410394 63572 113805 23282 25173 23165 22789 18340 25249 ...
+    ##  $ V7    : num  0.379 0.275 0.439 0.426 0.401 ...
+
+Here we're going to go through Ploidetect's internals to demonstrate what it's doing, step by step. First let's set the variables that would otherwise be handled by the parameters of ploidetect()
+
+``` r
+all_data <- clonalcase
+normal = 2
+tumour = 1
+avg_allele_freq =3
+window_id = 4
+window_size = 5
+GC = 6
+verbose = F
+```
+
+Note that you won't be able to call these functions yourself as they aren't exported by the namespace of the package
+
+``` r
+preprocess_output <- ploidetect_preprocess(all_data = all_data)
 ```

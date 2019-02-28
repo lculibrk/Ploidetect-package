@@ -176,7 +176,7 @@ modelbuilder_iterative <- function(xdists = xdists, allPeaks = allPeaks, lowest 
         if(!is.na(matchedPeaks$mainmaf[j])){
           error <- c()
           err <- c()
-          mafs <- filterednomafna$maf[filterednomafna$peak %in% matchedPeaks$npeak[j]]
+          mafs <- filterednomafna$mafflipped[filterednomafna$peak %in% matchedPeaks$npeak[j]]
           # CN for testing
           CN <- matchedPeaks$CN[j]
           # For below, we essentially make a vector of all possible MAF values at each CN state given the TC

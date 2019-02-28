@@ -1,24 +1,37 @@
 #' @export
 ploidetect <- function(all_data, normal = 2, tumour = 1, avg_allele_freq = 3, window_id = 4, window_size=5, GC = 6, plots = F, verbose = F, nomaf = F, lowest = NA, runCNAs = F, comp=NA, cndiff=NA, segmentation_threshold = 0.75, CNA_call = F, debugPlots = F){
 
-  
+  plots <- list()
   ## Run ploidetect_preprocess
 
   output <- ploidetect_preprocess(all_data = all_data, verbose = verbose, debugPlots = debugPlots, tumour = tumour, normal = normal, avg_allele_freq = avg_allele_freq, window_id = window_id, window_size = window_size, GC = GC)
   
   ## Unpack the output list from ploidetect_preprocess
   maxpeak <- output$maxpeak
-  x <- output$x
+  filtered <- output$x
   highoutliers <- output$highoutliers
   
   bw = maxpeak/40
   
-  ## Run ploidetect_transform
-  output <- ploidetect_transform(x, bw, verbose = verbose, tumour = tumour, normal = normal, avg_allele_freq = avg_allele_freq, window_id = window_id, window_size = window_size)
+  ## Perform peak calling with a heavily filtered "filtered" object to see how many we call:
+  allPeaks <- peakcaller(filtered[findInterval(filtered$residual, vec = quantile(filtered$residual, probs = c(0.01, 0.99))) == 1,], bw)
   
-  ## Unpack the output list from ploidetect_transform
-  allPeaks <- output$allPeaks
-  filtered <- output$filtered 
+  ## If we call zero peaks (due to poor bw, for example), try with half bandwidth and throw a warning
+  if(nrow(allPeaks) == 1){
+    warning("Zero peaks detected. Attempting peak calling with lower bandwidth")
+    bw = bw/2
+    allPeaks <- peakcaller(filtered[findInterval(filtered$residual, vec = quantile(filtered$residual, probs = c(0.01, 0.99))) == 1,], bw)
+  }
+  
+  ## Now we peak call with a much more permissive quantile filter
+  allPeaks <- peakcaller(filtered[findInterval(filtered$residual, vec = quantile(filtered$residual, probs = c(0.001, 0.999))) == 1,], bw)
+  
+  ## Center the residual and peak data about the tallest peak
+  filtered$residual <- filtered$residual - allPeaks$pos[1]
+  allPeaks$start <- allPeaks$start - allPeaks$pos[1]
+  allPeaks$end <- allPeaks$end - allPeaks$pos[1]
+  allPeaks$pos <- allPeaks$pos - allPeaks$pos[1]
+  
   ## Run processallpeaks
   output <- ploidetect_processallpeaks(filtered, allPeaks)
   
@@ -26,32 +39,34 @@ ploidetect <- function(all_data, normal = 2, tumour = 1, avg_allele_freq = 3, wi
   filtered <- output$filtered
   allPeaks <- output$allPeaks %>% filter(pos + maxpeak > 0)
   nomaf <- output$nomaf
+  
   ## Generate coverage plots for interpretation
   
-  filteredforplot <- filtered[findInterval(filtered$residual, vec = quantile(filtered$residual, probs = c(0.001, 0.999))) <= 1,]
+  filteredforplot <- filtered[findInterval(filtered$residual, vec = quantile(filtered$residual, probs = c(0.01, 0.99))) <= 1,]
   filteredforplot$residual <- filteredforplot$residual + maxpeak
   plot <- ggplot(data = filteredforplot, mapping = aes_string(x = "size", y = "residual", color = "mafflipped")) + geom_point(size = 0.1, alpha = 0.1) +
     #xlab("Window size") + 
-    xlab("Normalized window size of constant-coverage bins") + 
+    xlab("Window size of constant-coverage bins") + 
     #ylab("Reads mapping to bins in Somatic") + 
-    ylab("Residuals of reads mapping to constant-coverage bins in Somatic") + 
+    ylab("Normalized somatic read counts") + 
     #ggtitle(paste0("Coverage vs normalized bin size (Surrogate for Mappability + GC bias)")) + 
     ggtitle(paste0("Coverage Plot for Filtered and Normalised Data")) + 
     scale_colour_viridis(option = "plasma", name = "Major Allele\n Frequency") +
     #scale_x_continuous(limits = quantile(filtered$size, probs = c(0.05, 0.99))) +
     theme_bw(base_size = 12)
-  print(plot)
-  den <- density(filteredforplot$residual)
+  plots <- c(plots, list(plot))
+  den <- density(filteredforplot$residual, bw = bw)
+  dendf <- data.frame(x = den$x, y = den$y)
   # Normalize the density to 0->1 range
-  den$y <- (den$y - min(den$y))/(max(den$y) - min(den$y))
-  plot <- ggplot(mapping = aes(x = den$x, y = den$y)) + geom_line() + 
-    xlab("Residuals of Reads Mapping to 50kb windows in Somatic") + 
+  dendf$y <- (dendf$y - min(dendf$y))/(max(dendf$y) - min(dendf$y))
+  plot <- ggplot(data = dendf, mapping = aes(x = x, y = y)) + geom_line() + 
+    xlab("Normalized somatic read counts") + 
     ylab("Normalized Density") + 
-    ggtitle(paste0("Kernel Density Estimate of Residual Data")) + 
-    geom_vline(aes(xintercept = allPeaks$pos + maxpeak), linetype = 2) + 
-    geom_text(mapping = aes(x = allPeaks$pos + maxpeak, y = allPeaks$height + 0.05, label = paste0("MAF = ", round(allPeaks$mainmaf, digits = 3)))) +
+    ggtitle(paste0("Kernel Density Estimate of Count Data")) + 
+    geom_vline(data = allPeaks, aes(xintercept = pos + maxpeak), linetype = 2) + 
+    geom_text(data = allPeaks, aes(x = pos + maxpeak, y = allPeaks$height + 0.05, label = paste0("MAF = ", round(mainmaf, digits = 3)))) +
     theme_bw()
-  print(plot)
+  plots <- c(plots, list(plot))
   
   
   rerun = F
@@ -81,7 +96,7 @@ ploidetect <- function(all_data, normal = 2, tumour = 1, avg_allele_freq = 3, wi
   
   
   TC_calls <- list()
-  plots <- list()
+
   for(i in 1:nrow(xdists)){
     modelbuilder_output <- modelbuilder_iterative(xdists[i,], allPeaks = allPeaks, lowest = lowest, filtered = filtered, strict = T, get_homd = F, mode = "TC", nomaf = nomaf, rerun = rerun, maxpeak = maxpeak, bw = bw)
     TC_calls <- c(TC_calls, list(modelbuilder_output$out))
@@ -117,7 +132,7 @@ ploidetect <- function(all_data, normal = 2, tumour = 1, avg_allele_freq = 3, wi
   
   TC_calls <- TC_calls[ordering,]
   
-  plots <- plots[ordering]
+  plots <- plots[c(1, 2, ordering + 2)]
   
   #TC_calls <- do.call(rbind.data.frame, TC_calls) %>% arrange(newerr)
   

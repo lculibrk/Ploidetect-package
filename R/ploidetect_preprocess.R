@@ -40,7 +40,6 @@ ploidetect_preprocess <- function(all_data, normal = 2, tumour = 1, avg_allele_f
   x[,tumour] <- x[,tumour]/norm_factor
   
 
-  
   ## Perform basic pre-filtering, find the windows within the 90th percentile of tumour read counts
   rangedf <- x[findInterval(x[,tumour], 
                             quantile(x[,tumour], 
@@ -115,13 +114,13 @@ ploidetect_preprocess <- function(all_data, normal = 2, tumour = 1, avg_allele_f
   ## This scales the values such that they are linear (ie. removes any x~y relationship and ensures the variation is only in the y-axis)
   
   
-  x$normalized_tumour <- GCnorm$residuals
+  x$residual <- GCnorm$residuals
   
   ## We use window_size as a variable to represent the germline mappability in later steps
   x$normalized_size <- x$size
   
   if(debugPlots){
-    GCnorm2plot <- ggplot(x, aes(y = normalized_tumour, x = normalized_size)) + 
+    GCnorm2plot <- ggplot(x, aes(y = residual, x = normalized_size)) + 
       geom_point(size = 0.3, alpha = 0.1) + 
       theme_bw() + 
       xlab("Window size") + 
