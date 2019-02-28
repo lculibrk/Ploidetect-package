@@ -3,8 +3,8 @@ title: "Ploidetect Example Case"
 author: "Luka Culibrk"
 date: "2/11/2019"
 output: 
-  html_document:
-    keep_md: true
+  github_document:
+    pandoc_args: --webtex
 ---
 
 ```{r setup, include=FALSE}
@@ -37,7 +37,7 @@ Let's get a look at how the results look.
 purity_calls <- result$TC_calls
 plots <- result$plots
 knitr::kable(purity_calls)
-plots[[1]]
+plots[[3]]
 ```
 
 ## TC_calls object
@@ -192,3 +192,5 @@ However, determining the depth of a homozygous deletion may be challenging the c
 knitr::knit_exit()
 ```
 
+```{r}
+```
