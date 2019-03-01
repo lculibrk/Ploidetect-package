@@ -302,8 +302,8 @@ modelbuilder_iterative <- function(xdists = xdists, allPeaks = allPeaks, lowest 
   
   #fitpeaks <- fitpeaks[fitpeaks > 0]
   color_frame <- data.frame("positions" = fitpeaks, "col" = "#ED553B", stringsAsFactors = F)
-  matchedPeaks <- matchedPeaks %>% filter(!is.na(start))
   matchedPeaks$CN <- seq(from = out$lowest_peak_CN[1], length.out = nrow(matchedPeaks))
+  matchedPeaks <- matchedPeaks %>% filter(!is.na(start))
   matchedPeaks <- matchedPeaks %>% arrange(pos)
   for(i in 1:nrow(matchedPeaks)){
     if(matchedPeaks$CN[i] == 0){

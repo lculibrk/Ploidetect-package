@@ -204,6 +204,11 @@ window_id = 4
 window_size = 5
 GC = 6
 verbose = F
+rerun = F
+lowest = NA
+cndiff = NA
+comp = NA
+nomaf = F
 ```
 
 Note that you won't be able to call these functions yourself as they aren't exported by the namespace of the package.
@@ -258,10 +263,11 @@ plot(dkde(filtered$residual, deriv.order = 2, h = bw))
 Of course, since we used a simple heuristic for bandwidth, we should probably throw another heuristic in for good measure. What if we detect only one peak in the data? Either there is no copy number variation, or Ploidetect needs to reduce the bandwidth. So as a first pass Ploidetect filters the data relatively stringently, by using a quantile filter from the 1st to 99th percentiles of read depth and calls peaks. Don't worry too much about what all of the variables mean.
 
 ```{r}
-(allPeaks <- peakcaller(filtered[findInterval(filtered$residual, vec = quantile(filtered$residual, probs = c(0.01, 0.99))) == 1,], bw))
+allPeaks <- peakcaller(filtered[findInterval(filtered$residual, vec = quantile(filtered$residual, probs = c(0.01, 0.99))) == 1,], bw)
+knitr::kable(allPeaks)
 ```
 
-So we've called more than one peak, we can continue with the same bandwidth, but a less stringent filter (0.1st percentile and 99.9th). If Ploidetect called only one then it would try again by halving the bandwidth
+So we've called more than one peak, we can continue with the same bandwidth, but a less stringent filter (99.9th percentile only). If Ploidetect called only one then it would try again by halving the bandwidth
 
 ```{r}
 if(nrow(allPeaks) == 1){
@@ -271,7 +277,8 @@ if(nrow(allPeaks) == 1){
 }
 
 ## Now we peak call with a much more permissive quantile filter
-(allPeaks <- peakcaller(filtered[findInterval(filtered$residual, vec = quantile(filtered$residual, probs = c(0.001, 0.999))) == 1,], bw))
+allPeaks <- peakcaller(filtered[findInterval(filtered$residual, vec = quantile(filtered$residual, probs = c(0, 0.999))) == 1,], bw)
+knitr::kable(allPeaks)
 ```
 
 So you can see the less stringent filtering resulted in another peak being called. Next we do a bit of housekeeping and center the positions and read depths around zero
@@ -327,27 +334,143 @@ plot <- ggplot(data = dendf, mapping = aes(x = x, y = y)) + geom_line() +
 plot
 ```
 
-I've already told you that this case has subclonal copy number variation. Some clues to this are evident in the above plot. We see that there is a main peak which is tallest by height, as well as a number of others of varying heights. If we try the approach that was demonstrated with our toy example, we would be wrong. Let's demonstrate why by first assuming we can indeed try the original approach. Let's take a look at allPeaks, sorted by position
+I've already told you that this case has subclonal copy number variation. I'm going to spoil it right away and tell you that the peaks immediately adjacent to the tallest one are the result of subclonal copy number events. The reasons for this will become more clear in a bit.
+
+If you recall with the toy case, we used the plot information to estimate the number of reads that align to a single copy of the tumour genome, which we will refer to as the number of reads per copy. This is done by Ploidetect by selecting a set of peaks that it reasonably believes to correspond to integer copy number variants, and using those peaks to determine the reads per copy. Here's the table of peaks again:
 
 ```{r}
-allPeaks %>% arrange(pos)
-maxpeak
+allPeaks %>% arrange(pos) %>% knitr::kable()
 ```
 
-The difference in depth between peak 3 and peak 4 (as defined by the npeak variable) is 1835. The depth of the main peak is 18840 (from maxpeak), and the allele frequency is close to 0.5, which tells us that this peak has an even number of copies. Under this assumption, this tumour must be tetraploid, with peak 1 corresponding to homozygous deletions. Going back to the earlier equations, this information gives us $reads_n = 18440 - 7472$ and $\sum reads = 18440 - 3726$. Using the equation for $\alpha$, we get a purity value of `r (18440-7472)/(18440-3726)`
+So one example model might select peaks 1, 2, 4, 6, 7, and 9 (peaks are numbered by depth). Then, we can compute the tumour purity using this information. To generate these models, Ploidetect needs to first perform a rough estimation step. Iteratively, Ploidetect selects the tallest peak (peak 4 in this case) and another peak in the dataset to serve as a comparator. For this case, let's select peak 2. 
 
 ```{r}
-knitr::knit_exit()
-#testMAF()
+allPeaks_plot <- allPeaks
+allPeaks_plot$selected <- F
+allPeaks_plot$selected[allPeaks$npeak %in% c(2, 4)] <- T
+plot <- ggplot(data = dendf, mapping = aes(x = x, y = y)) + geom_line() + 
+  xlab("Normalized somatic read counts") + 
+  ylab("Normalized Density") + 
+  ggtitle(paste0("Peaks 1 and 2")) + 
+  geom_vline(data = allPeaks_plot, aes(xintercept = pos + maxpeak, color = selected), linetype = 2) + 
+  geom_text(data = allPeaks_plot, aes(x = pos + maxpeak, y = allPeaks$height + 0.05, label = paste0("MAF = ", round(mainmaf, digits = 3)))) +
+  theme_bw() + 
+  scale_color_viridis(discrete = T)
+plot
 ```
+
+The difference in coverage between peaks 1 and 2:
 
 ```{r}
+allPeaks$diff[which(allPeaks$npeak == 2)]
+```
 
-## Unpack the output list from ploidetect_transform
-allPeaks <- output$allPeaks
-filtered <- output$filtered 
-## Run processallpeaks
-output <- ploidetect_processallpeaks(filtered, allPeaks)
+If we move left and right in steps of 3730 reads, we would notice that we land very close to peak 1, peak 6, peak 7, and peak 9:
 
+```{r}
+diffvalue <- allPeaks$diff[which(allPeaks$npeak == 2)]
+positions <- seq(from = -2*diffvalue, by = diffvalue, length.out = 6) + maxpeak
+
+allPeaks_plot <- allPeaks
+allPeaks_plot$selected <- F
+allPeaks_plot$selected[allPeaks$npeak %in% c(2, 4)] <- T
+plot <- ggplot(data = dendf, mapping = aes(x = x, y = y)) + geom_line() + 
+  xlab("Normalized somatic read counts") + 
+  ylab("Normalized Density") + 
+  ggtitle(paste0("Extrapolating model for peaks 1 and 2 with a diff of one")) + 
+  geom_vline(data = data.frame(positions = positions), aes(xintercept = positions), linetype = 2) + 
+  geom_text(data = allPeaks_plot, aes(x = pos + maxpeak, y = allPeaks$height + 0.05, label = paste0("MAF = ", round(mainmaf, digits = 3)))) +
+  theme_bw() + 
+  scale_color_viridis(discrete = T)
+plot
+```
+
+This model was generated by selecting peak 2 as the comparator, and assuming a copy number difference between peak 1 and 2 of one. This model has matched with peaks 1, 2, 4, 6, 7, and 9.
+
+Alternatively, we might assume that peak 2 is two copies away from peak 1, in which case we would move left and right in steps of 1865 reads.
+
+```{r}
+diffvalue <- allPeaks$diff[which(allPeaks$npeak == 2)]/2
+positions <- seq(from = -4*diffvalue, by = diffvalue, length.out = 12) + maxpeak
+
+allPeaks_plot <- allPeaks
+allPeaks_plot$selected <- F
+allPeaks_plot$selected[allPeaks$npeak %in% c(2, 4)] <- T
+plot <- ggplot(data = dendf, mapping = aes(x = x, y = y)) + geom_line() + 
+  xlab("Normalized somatic read counts") + 
+  ylab("Normalized Density") + 
+  ggtitle(paste0("Extrapolating model for peaks 1 and 2 with a diff of two")) + 
+  geom_vline(data = data.frame(positions = positions), aes(xintercept = positions), linetype = 2) + 
+  geom_text(data = allPeaks_plot, aes(x = pos + maxpeak, y = allPeaks$height + 0.05, label = paste0("MAF = ", round(mainmaf, digits = 3)))) +
+  theme_bw() + 
+  scale_color_viridis(discrete = T)
+plot
 
 ```
+
+This model was generated again by selecting peak 2 as the comparator, and assuming a copy number difference of two. While this model matched with all of the peaks, it predicted that there should be peaks in locations we don't find any, for example between peaks 1 and 2 or 6 and 7. 
+
+ploidetect_roughmodels will do this for each peak, as well as a variety of copy number differences
+
+```{r}
+xdists <- ploidetect_roughmodels(allPeaks = allPeaks, maxpeak, verbose = verbose, rerun = rerun)
+str(xdists)
+```
+
+You can ignore the "mean_err" variable here. Each row of the xdists object describes a model, such as the ones above, that Ploidetect has fit to the data. The unmatched variable is a list of the peaks that were not matched by the model, and the predunmatched variable lists the positions of peaks that were predicted to occur but were not detected. This information is used as input to modelbuilder_iterative(), which is a fairly verbose function that takes this information and selects a model that balances fitting a maximum number of peaks, predicting few imaginary peaks and minimizing the difference between predicted and observed allele frequencies using a dirty heuristic algorithm. 
+
+```{r}
+allPeaks$pos <- allPeaks$pos + maxpeak
+TC_calls <- list()
+
+for(i in 1:nrow(xdists)){
+  modelbuilder_output <- modelbuilder_iterative(xdists[i,], allPeaks = allPeaks, lowest = lowest, filtered = filtered, strict = T, get_homd = F, mode = "TC", nomaf = nomaf, rerun = rerun, maxpeak = maxpeak, bw = bw)
+  TC_calls <- c(TC_calls, list(modelbuilder_output$out))
+  plots <- c(plots, list(modelbuilder_output$outplot))
+}
+
+TC_calls <- do.call(rbind.data.frame, TC_calls) %>% arrange(model_error)
+knitr::kable(TC_calls)
+```
+
+And we're back to the familiar output data! As an aside, we have essentially mirrored Ploidetect's default behavior:
+
+
+```{r}
+subclonalcalls <- ploidetect(clonalcase)
+subclonalcalls$TC_calls %>% knitr::kable()
+```
+
+So now, an interesting thought arises; what if we decided that Ploidetect's top model (Ploidy = `r subclonalcalls$TC_calls$Ploidy[1]`, purity = `r subclonalcalls$TC_calls$tumour_purity[1]`) was wrong? What if, based on our own inspection of the data and what we have learned so far, we decided that Ploidetect made a mistake and the correct model should have been the second on the list? Or what if the model looks correct but the ploidy is wrong? This is why Ploidetect provides a ton of plots for you - it helps with manual review.
+
+The first two plots that Ploidetect returns will be a scatter plot of the coverage and a plot of all of the called peaks:
+
+
+```{r}
+subclonalcalls$plots[1:2]
+```
+
+
+The next plots will illustrate the models that Ploidetect used for each of the purity predictions
+
+```{r}
+subclonalcalls$plots[c(3, 5)]
+```
+
+So let's say that the other model looks more correct for whatever reason. We can force Ploidetect to pick this model, using the information in the table or the plot (note the CN_diff and comparator values):
+
+```{r}
+newsubclonalcalls <- ploidetect(clonalcase, cndiff = 4, comp = 9, lowest = 0)
+newsubclonalcalls$TC_calls %>% knitr::kable()
+newsubclonalcalls$plots[3]
+```
+
+These features (and indeed, this tutorial) is there for the inevitable cases where Ploidetect gets it wrong. The way we could tell for this case is by looking at peak 5; it has an allele frequency of 0.517. If it were an integer copy number, it would have five copies.
+
+```{r}
+testMAF(CN = 5, tp = 0.24)
+```
+
+We expect a MAF of 0.544 for this, but we see nearly 0.5. Not good!
+
+Furthermore, the pattern that we see is usually not represented in a tumour without subclonal copy number variation. Nearly always, the -1 and +1 copy number peaks (with respect to the largest one) aren't smaller than the -2 or +2. When you see this pattern you might want to take a closer look.

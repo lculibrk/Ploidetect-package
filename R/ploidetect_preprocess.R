@@ -98,7 +98,7 @@ ploidetect_preprocess <- function(all_data, normal = 2, tumour = 1, avg_allele_f
   GCnorm <- loessFit(y = x$y_raw, x = x$GC, span = 0.3)
   
   ## Residuals of this model can be thought of as the normalized read counts, so scale them back to something resembling read counts
-  GCnorm$residuals <- GCnorm$residuals + median(x$y_raw)
+  GCnorm$residuals <- GCnorm$residuals
   
   if(debugPlots){
     GCnormplot <- ggplot(x, aes(y = GCnorm$residuals, x = size)) + 

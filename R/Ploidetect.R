@@ -11,7 +11,7 @@ ploidetect <- function(all_data, normal = 2, tumour = 1, avg_allele_freq = 3, wi
   filtered <- output$x
   highoutliers <- output$highoutliers
   
-  bw = maxpeak/40
+  bw = maxpeak/80
   
   ## Perform peak calling with a heavily filtered "filtered" object to see how many we call:
   allPeaks <- peakcaller(filtered[findInterval(filtered$residual, vec = quantile(filtered$residual, probs = c(0.01, 0.99))) == 1,], bw)
@@ -24,7 +24,7 @@ ploidetect <- function(all_data, normal = 2, tumour = 1, avg_allele_freq = 3, wi
   }
   
   ## Now we peak call with a much more permissive quantile filter
-  allPeaks <- peakcaller(filtered[findInterval(filtered$residual, vec = quantile(filtered$residual, probs = c(0.001, 0.999))) == 1,], bw)
+  allPeaks <- peakcaller(filtered[findInterval(filtered$residual, vec = quantile(filtered$residual, probs = c(0, 0.999))) == 1,], bw)
   
   ## Center the residual and peak data about the tallest peak
   filtered$residual <- filtered$residual - allPeaks$pos[1]

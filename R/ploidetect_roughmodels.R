@@ -20,6 +20,8 @@ ploidetect_roughmodels <- function(allPeaks, maxpeak, verbose = F, rerun = rerun
         if(verbose){
           print(paste0("Generating model for CN difference between fitted peaks = ", j,  " with secondary peak as #", l, " in terms of intensity"))
         }
+        # Experimental
+        weights <- allPeaks$height[l]
         # Compute the estimate of reads-per-copy
         x = abs((allPeaks$pos[1] - allPeaks$pos[l])/j)
         # Simulate peak topology given x for positive and negative peaks
@@ -30,36 +32,27 @@ ploidetect_roughmodels <- function(allPeaks, maxpeak, verbose = F, rerun = rerun
         #Extract separate lists of + and - peaks
         posPeaks <- allPeaks %>% filter(allPeaks$pos > 0)
         negPeaks <- allPeaks %>% filter(allPeaks$pos < 0)
-        # KDE for plotting
-        #newden <- density(filtered$new_residual)
-        if(F){
-          #plotPeaks <- allPeaks
-          #plotPeaks <- allPeaks %>% arrange(pos)
-          #plotPeaks$height[c(1, nrow(plotPeaks))] <- plotPeaks$height[c(1, nrow(plotPeaks))]/100
-          plot <- ggplot(mapping = aes(x = newden$x + maxpeak, y = (newden$y - min(newden$y))/(max(newden$y) - min(newden$y)))) + 
-            geom_line() + 
-            xlab("Residuals of Reads Mapping to 50kb windows in Somatic") + 
-            ylab("Normalized Density") + 
-            ggtitle(paste0("Predicted Density Distributions for CN difference = ", j, " and comparator peak = ", l)) + 
-            geom_vline(aes(xintercept = c(pos, neg) + maxpeak), linetype = 2) + 
-            geom_text(mapping = aes(x = allPeaks$pos + maxpeak, y = allPeaks$height + 0.05, label = paste0("MAF = ", round(allPeaks$mainmaf, digits = 3))), position = "dodge") +
-            theme_bw(base_size = 20)
-          print(plot)
-        }
         # Set initialized values
         t <- 0
         matchedPeaks <- c()
         pos.errors <- c()
         # For the positive peaks
-        for(k in 2:length(pos)){
-          # If we have positive peaks...
-          if(nrow(posPeaks) > 0){
+        if(nrow(posPeaks) > 0){
+          for(k in 2:length(pos)){
+            pos <- seq(from = allPeaks$pos[1], to = max(allPeaks$pos) + x, by = x)
+            if(k > length(pos)){
+              break
+            }
+            # If we have positive peaks...
             # If we haven't matched this peak yet in the previous iteration
             if(t != which.min(abs(pos[k] - posPeaks$pos))){
               # If the peak is actually somewhere in the vicinity of where we expect it
               if(min(abs(pos[k] - posPeaks$pos)) <= x/4){
                 # Which peak is closest to predicted?
                 t <- which.min(abs(pos[k] - posPeaks$pos))
+                x <- weighted.mean(c(x, posPeaks$pos[t]/(k-1)), w = c(weights, posPeaks$height[t]))
+                weights <- weights + posPeaks$height[t]
+                pos <- seq(from = allPeaks$pos[1], to = max(allPeaks$pos) + x, by = x)
                 if(verbose){
                   print(paste0("matched positive peak indices in allPeaks is ", posPeaks$npeak[t]))
                 }
@@ -74,11 +67,19 @@ ploidetect_roughmodels <- function(allPeaks, maxpeak, verbose = F, rerun = rerun
         # Same as before, but with negatives
         t <- 0
         neg.errors <- c()
-        for(k in 2:length(neg)){
-          if(nrow(negPeaks) > 0){
+        neg <- seq(from = allPeaks$pos[1], to = min(allPeaks$pos) - x, by = -x)
+        if(nrow(negPeaks) > 0){
+          for(k in 2:length(neg)){
+            neg <- seq(from = allPeaks$pos[1], to = min(allPeaks$pos) - x, by = -x)
+            if(k > length(neg)){
+              break
+            }
             if(t != which.min(abs(neg[k] - negPeaks$pos))){
-              if(min(abs(neg[k] - negPeaks$pos)) <= x/2){
+              if(min(abs(neg[k] - negPeaks$pos)) <= x/4){
                 t <- which.min(abs(neg[k] - negPeaks$pos))
+                x <- weighted.mean(c(x, abs(negPeaks$pos[t])/(k-1)), w = c(weights, negPeaks$height[t]))
+
+                weights <- weights + negPeaks$height[t]
                 neg.errors <- c(neg.errors, negPeaks$height[t] * abs(neg[k] - negPeaks$pos)[t])
                 matchedPeaks <- c(matchedPeaks, negPeaks$npeak[t])
               }
@@ -151,5 +152,6 @@ ploidetect_roughmodels <- function(allPeaks, maxpeak, verbose = F, rerun = rerun
   if(nrow(allPeaks) == 1){
     xdists <- "No Copy number alteration detected. If you're sure (from seeing peaks in Ploidetect's plots) that CNAs exist but were not detected, rerun with a lower bandwidth value. Otherwise, TC cannot be determined by this method"
   }
+  xdists <- xdists %>% group_by(unmatched, predunmatched) %>% dplyr::summarise(reads_per_copy = mean(reads_per_copy), Copy_number_difference_between_peaks = first(Copy_number_difference_between_peaks), Comparator_peak_rank = first(Comparator_peak_rank))
   return(xdists)
 }
