@@ -298,7 +298,12 @@ modelbuilder_iterative <- function(xdists = xdists, allPeaks = allPeaks, lowest 
       out$maf_error[which(out$lowest_peak_CN == level)] <- as.numeric(mafdeveven[paste0(level)])
     }
   }
+  
   out <- out[which.min(out$maf_error),]
+  
+  if(nrow(out) == 0){
+    return()
+  }
   
   #fitpeaks <- fitpeaks[fitpeaks > 0]
   color_frame <- data.frame("positions" = fitpeaks, "col" = "#ED553B", stringsAsFactors = F)

@@ -1,7 +1,7 @@
 ploidetect_loh <- function(purity, CNA_object){
   CNA_object <- CNA_object %>% arrange(CN)
   CNA_object <- CNA_object %>% group_by(chr, segment) %>% dplyr::mutate("median_maf" = median(mafflipped, na.rm = T))
-  CNA_object$LOH <- NA
+  CNA_object$LOH <- F
   CNA_object_mafs <- CNA_object[which(!is.na(CNA_object$median_maf)),]
   CNA_object_nomafs <- CNA_object[which(is.na(CNA_object$median_maf)),]
   allCNs <- unique(CNA_object_mafs$CN)
@@ -14,7 +14,6 @@ ploidetect_loh <- function(purity, CNA_object){
     almost_LOH_maf <- mafs[length(mafs) - 1]
     maf_possibilities[paste0(copynumber)] <- list(c(LOH_maf, almost_LOH_maf))
   }
-
   for(row in 1:nrow(CNA_object_mafs)){
     CN <- paste0(CNA_object_mafs$CN[row])
     if(CN == "1"){
