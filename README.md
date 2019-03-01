@@ -33,4 +33,4 @@ The outputs can be accessed from the output list:
 
 ```output$CN_calls``` will give you the segmented copy number calls
 
-If you believe Ploidetect made an error in automatic model estimation,you can supply it with the information of the model you believe to be correct using the ```cndiff```, ```lowest```, and ```comp``` parameters for ```ploidetect()```. Please see the demo (Currently under construction) for more information on this. 
+If you believe Ploidetect made an error in automatic model estimation,you can supply it with the information of the model you believe to be correct using the ```cndiff```, ```lowest```, and ```comp``` parameters for ```ploidetect()```.Please see the [demo](demo/Demo.md) (Currently under construction) for more information on this. 
