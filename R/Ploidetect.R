@@ -57,7 +57,7 @@ ploidetect <- function(all_data, normal = 2, tumour = 1, avg_allele_freq = 3, wi
   plots <- c(plots, list(plot))
   den <- density(filteredforplot$residual, bw = bw)
   dendf <- data.frame(x = den$x, y = den$y)
-  # Normalize the density to 0->1 range
+  # Normalize the density to 0->1 range and plot
   dendf$y <- (dendf$y - min(dendf$y))/(max(dendf$y) - min(dendf$y))
   plot <- ggplot(data = dendf, mapping = aes(x = x, y = y)) + geom_line() + 
     xlab("Normalized somatic read counts") + 
@@ -78,7 +78,7 @@ ploidetect <- function(all_data, normal = 2, tumour = 1, avg_allele_freq = 3, wi
   
   ## Can't really do much else if there's only one peak in the data, so we return a message explaining this and exit
   if(nrow(allPeaks) == 1){
-    return(list("TC_calls" = xdists, "plots" = NA, "CN_calls" = NA))
+    return(list("TC_calls" = xdists, "plots" = plots, "CN_calls" = NA))
   }
   
   ## Normalize allPeaks to maxPeak
@@ -134,8 +134,6 @@ ploidetect <- function(all_data, normal = 2, tumour = 1, avg_allele_freq = 3, wi
   
   plots <- plots[c(1, 2, ordering + 2)]
   
-  #TC_calls <- do.call(rbind.data.frame, TC_calls) %>% arrange(newerr)
-  
   if(!CNA_call){
     return(list("TC_calls" = TC_calls, "plots" = plots, "CN_calls" = NULL))
   }
@@ -152,13 +150,102 @@ ploidetect <- function(all_data, normal = 2, tumour = 1, avg_allele_freq = 3, wi
   
   CN_calls <- ploidetect_segmentator(filtered, matchedPeaks, maxpeak, predictedpositions, highoutliers, depthdiff, avg_allele_freq = avg_allele_freq, window_size = window_size, window_id = window_id, tumour = tumour, segmentation_threshold = segmentation_threshold)
   
-  result_segments <- CN_calls %>% group_by(chr, segment) %>% dplyr::summarise(pos = min(pos), end = max(end), residual = median(residual))
+  CN_calls <- ploidetect_loh(purity = TC_calls$tumour_purity[1], CNA_object = CN_calls)
   
-  segmentation_plot <- ggplot(CN_calls, aes(x = pos, y = raw_residual + maxpeak)) + geom_point(size = 0.5) + scale_color_viridis() + geom_segment(data = result_segments, mapping = aes(y = residual, yend = residual, x = pos, xend = end), size = 1, color = "red") + facet_wrap(~chr, ncol = 3) + ggtitle("Segmentation results")
-
-  CNA_plot <- ggplot(CN_calls, aes(x = pos, y = raw_residual + maxpeak, color = CN)) + geom_point(size = 0.5) + scale_color_viridis() + facet_wrap(~chr, ncol = 3) + ggtitle("Copy number profile")
-
-  plots <- c(plots, list(segmentation_plot), list(CNA_plot))
+  ## 0 = HOMD, 1 = 1cp, 2 = 2cp het, 3 = 2cp HOM, 4 = 3cp het, 5 = 3cp HOM, 6 = 4cp het, 7 = 4cp HOM, 8 = 5cp+
+  CN_calls$state <- 0
+  
+  for(row in 1:nrow(CN_calls)){
+    CN <- CN_calls$CN[row]
+    if(CN >= 5){
+      CN_calls$state[row] <- 8
+    }
+    if(CN == 0){
+      CN_calls$state[row] <- 0
+    }
+    if(CN == 1){
+      CN_calls$state[row] <- 1
+    }
+    if(CN == 2){
+      if(CN_calls$LOH[row]){
+        CN_calls$state[row] <- 3
+      }else{
+        CN_calls$state[row] <- 2
+      }
+    }
+    if(CN == 3){
+      if(CN_calls$LOH[row]){
+        CN_calls$state[row] <- 5
+      }else{
+        CN_calls$state[row] <- 4
+      }
+    }
+    if(CN == 4){
+      if(CN_calls$LOH[row]){
+        CN_calls$state[row] <- 7
+      }else{
+        CN_calls$state[row] <- 6
+      }
+    }
+  }
+  
+  CN_calls$state <- factor(CN_calls$state)
+  
+  CN_palette <- c("0" = "#cc0000", "1" = "#000066", "2" = "#26d953", "3" = "#609f70", "4" ="#cccc00", "5" = "#80804d", "6" = "#cc6600", "7" = "#856647", "8" = "#cc0000")
+  
+  CN_calls <- split(CN_calls, f = CN_calls$chr)
+  
+  CNA_plot <- lapply(CN_calls, function(x){
+    chr = x$chr[1]
+    ggplot(x, aes(x = pos, y = log(raw_residual + maxpeak), color = as.character(state))) + 
+      geom_point(size = 0.5) + 
+      scale_color_manual(name = "State",
+                         values = CN_palette, 
+                         labels = c("0" = "HOMD", 
+                                    "1" = "CN = 1", 
+                                    "2" = "CN = 2 HET", 
+                                    "3" = "CN = 2 HOM", 
+                                    "4" = "CN = 3 HET", 
+                                    "5" = "CN = 3 HOM", 
+                                    "6" = "CN = 4 HET", 
+                                    "7" = "CN = 4 HOM", 
+                                    "8" = "CN = 5+")) + 
+      ylab("log(Read Depth)") + 
+      xlab("position") + 
+      ggtitle(paste0("Chromosome ", chr, " copy number profile")) + 
+      theme_bw()
+  })
+  
+  vaf_plot <- lapply(CN_calls, function(x){
+    chr = x$chr[1]
+    ggplot(x, aes(x = pos, y = mafflipped, color = as.character(state))) + 
+      geom_point(size = 0.5) + 
+      scale_color_manual(name = "State",
+                         values = CN_palette, 
+                         labels = c("0" = "HOMD", 
+                                    "1" = "CN = 1", 
+                                    "2" = "CN = 2 HET", 
+                                    "3" = "CN = 2 HOM", 
+                                    "4" = "CN = 3 HET", 
+                                    "5" = "CN = 3 HOM", 
+                                    "6" = "CN = 4 HET", 
+                                    "7" = "CN = 4 HOM", 
+                                    "8" = "CN = 5+")) + 
+      ylab("Major allele frequency") + 
+      xlab("position") + 
+      ggtitle(paste0("Chromosome ", chr, " allele frequency profile")) + 
+      theme_bw()
+  })
+  
+  cna_plots <- list()
+  
+  for(i in 1:length(CNA_plot)){
+    cna_plots[i] <- list(plot_grid(CNA_plot[[i]], vaf_plot[[i]], align = "v", axis = "l", ncol = 1))
+  }
+  
+  CN_calls <- do.call(rbind.data.frame, CN_calls)
+  
+  plots <- c(plots, cna_plots)
   
   return(list("TC_calls" = TC_calls, "plots" = plots, "CN_calls" = CN_calls))
 }

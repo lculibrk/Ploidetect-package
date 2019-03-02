@@ -151,6 +151,7 @@ ploidetect_roughmodels <- function(allPeaks, maxpeak, verbose = F, rerun = rerun
   }
   if(nrow(allPeaks) == 1){
     xdists <- "No Copy number alteration detected. If you're sure (from seeing peaks in Ploidetect's plots) that CNAs exist but were not detected, rerun with a lower bandwidth value. Otherwise, TC cannot be determined by this method"
+    return(xdists)
   }
   xdists <- xdists %>% group_by(unmatched, predunmatched) %>% dplyr::summarise(reads_per_copy = mean(reads_per_copy), Copy_number_difference_between_peaks = first(Copy_number_difference_between_peaks), Comparator_peak_rank = first(Comparator_peak_rank))
   return(xdists)

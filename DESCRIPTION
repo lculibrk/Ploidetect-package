@@ -1,7 +1,7 @@
 Package: Ploidetect
-Title: What the Package Does (one line, title case)
-Version: 0.0.0.9000
-Authors@R: person("First", "Last", email = "first.last@example.com", role = c("aut", "cre"))
+Title: Interpretable detection of tumour purity, ploidy, copy number variation and loss of heterozygosity
+Version: 0.5
+Authors@R: person("Luka", "Culibrk", email = "lculibrk@bcgsc.ca", role = c("aut", "cre"))
 Description: What the package does (one paragraph).
 Depends:
 	R (>= 3.4.1),
@@ -11,7 +11,8 @@ Depends:
 	limma,
 	kedd,
 	ggplot2,
-	viridis
+	viridis,
+	cowplot
 License: What license is it under?
 Encoding: UTF-8
 LazyData: true
@@ -22,5 +23,6 @@ Imports:
 	limma,
 	kedd,
 	ggplot2,
-	viridis
+	viridis,
+	cowplot
 RoxygenNote: 6.1.1

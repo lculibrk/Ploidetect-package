@@ -635,13 +635,13 @@ subclonalcalls$plots[c(3, 5)]
 So let's say that the other model looks more correct for whatever reason. We can force Ploidetect to pick this model, using the information in the table or the plot (note the CN\_diff and comparator values):
 
 ``` r
-newsubclonalcalls <- ploidetect(clonalcase, cndiff = 1, comp = 2, lowest = 0)
+newsubclonalcalls <- ploidetect(clonalcase, cndiff = 4, comp = 9, lowest = 0)
 newsubclonalcalls$TC_calls %>% knitr::kable()
 ```
 
 |     |  reads\_per\_copy|  zero\_copy\_depth|  Ploidy|  tumour\_purity|  lowest\_peak\_CN|  maf\_error|  CN\_diff|  Comparator|  model\_error|  avg\_ploidy|  unmatchedpct|
 |-----|-----------------:|------------------:|-------:|---------------:|-----------------:|-----------:|---------:|-----------:|-------------:|------------:|-------------:|
-| 0   |          3737.881|           11356.66|       2|       0.3969623|                 0|   0.0357153|         1|           2|      2.274904|         1.79|     0.2098118|
+| 0   |          1820.285|           11510.85|       4|       0.2402791|                 0|   0.0809966|         4|           9|       2.67391|         3.45|     0.0165224|
 
 ``` r
 newsubclonalcalls$plots[3]
