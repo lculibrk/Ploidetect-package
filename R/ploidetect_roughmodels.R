@@ -47,7 +47,7 @@ ploidetect_roughmodels <- function(allPeaks, maxpeak, verbose = F, rerun = rerun
             # If we haven't matched this peak yet in the previous iteration
             if(t != which.min(abs(pos[k] - posPeaks$pos))){
               # If the peak is actually somewhere in the vicinity of where we expect it
-              if(min(abs(pos[k] - posPeaks$pos)) <= x/4){
+              if(min(abs(pos[k] - posPeaks$pos)) <= x/2){
                 # Which peak is closest to predicted?
                 t <- which.min(abs(pos[k] - posPeaks$pos))
                 x <- weighted.mean(c(x, posPeaks$pos[t]/(k-1)), w = c(weights, posPeaks$height[t]))
@@ -75,7 +75,7 @@ ploidetect_roughmodels <- function(allPeaks, maxpeak, verbose = F, rerun = rerun
               break
             }
             if(t != which.min(abs(neg[k] - negPeaks$pos))){
-              if(min(abs(neg[k] - negPeaks$pos)) <= x/4){
+              if(min(abs(neg[k] - negPeaks$pos)) <= x/2){
                 t <- which.min(abs(neg[k] - negPeaks$pos))
                 x <- weighted.mean(c(x, abs(negPeaks$pos[t])/(k-1)), w = c(weights, negPeaks$height[t]))
 

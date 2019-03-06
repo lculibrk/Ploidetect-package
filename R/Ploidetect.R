@@ -42,7 +42,7 @@ ploidetect <- function(all_data, normal = 2, tumour = 1, avg_allele_freq = 3, wi
   
   ## Generate coverage plots for interpretation
   
-  filteredforplot <- filtered[findInterval(filtered$residual, vec = quantile(filtered$residual, probs = c(0.01, 0.99))) <= 1,]
+  filteredforplot <- filtered %>% filter(residual < max(allPeaks$pos))
   filteredforplot$residual <- filteredforplot$residual + maxpeak
   plot <- ggplot(data = filteredforplot, mapping = aes_string(x = "size", y = "residual", color = "mafflipped")) + geom_point(size = 0.1, alpha = 0.1) +
     #xlab("Window size") + 
