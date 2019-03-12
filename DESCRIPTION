@@ -1,6 +1,6 @@
 Package: Ploidetect
 Title: Interpretable detection of tumour purity, ploidy, copy number variation and loss of heterozygosity
-Version: 0.5
+Version: 0.6
 Authors@R: person("Luka", "Culibrk", email = "lculibrk@bcgsc.ca", role = c("aut", "cre"))
 Description: What the package does (one paragraph).
 Depends:

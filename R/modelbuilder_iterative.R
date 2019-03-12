@@ -257,9 +257,9 @@ modelbuilder_iterative <- function(xdists = xdists, allPeaks = allPeaks, lowest 
       }
     }
     #if we have a case of ridiculous by-chance fit with peak skipping (< 10^-8 works well), filter out
-    if((unmatchederror > 0 & newerrors < 10^-8 & newerrors > 0)){
-      x <-  NA
-    }
+    #if((unmatchederror > 0 & newerrors < 10^-8 & newerrors > 0)){
+    #  x <-  NA
+    #}
     # If no maf in data
     if(nomaf){
       mafdev[paste0(lowestpeak)] <- NA
