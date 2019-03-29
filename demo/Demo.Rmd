@@ -11,7 +11,7 @@ output:
 library(devtools)
 devtools::load_all(pkg = "../", reset = T)
 #install_github("lculibrk/Ploidetect-package")
-library(Ploidetect)
+#library(Ploidetect)
 ```
 
 ## Data import
@@ -167,24 +167,24 @@ genome_obj %>% group_by(copynumber) %>% dplyr::summarise("mean_cov" = mean(count
 Now we just plug these numbers in:
 
 ```{r}
-20.4/40.1
+20/40.1
 ```
 
-Tumour purity is 50.9% for our toy example.
+Tumour purity is `r predict(object = fit, data.frame("copynumber" = 0))/40.1` for our toy example.
 
 The above is the methodology that Ploidetect uses to determine tumour purity. Let's do the estimate for the cancer case ourselves.
 
 ```{r}
-result$plots[[1]]
+result$plots[[3]]
 ```
 
-CN=2 occurs at approximately 13000 depth, and CN=1 occurs at about 11000. CN=0 must occur at about 9000. As an aside, Ploidetect knows the copy number state of the peaks in the histogram by fitting the SNP allele frequencies indicted by "MAF = x" in the plot. 
+CN=2 occurs at approximately 55000 depth, and CN=1 occurs at about 45000. CN=0 must occur at about 35000. As an aside, Ploidetect knows the copy number state of the peaks in the histogram by fitting the SNP allele frequencies indicted by "MAF = x" in the plot. 
 
 ```{r}
-1 - 9000/13000
+1 - 35000/55000
 ```
 
-Eyeballing it gives us 31% purity, and Ploidetect predicted 39%.
+Eyeballing it gives us 36% purity, and Ploidetect predicted 39%.
 
 However, determining the depth of a homozygous deletion may be challenging the case of a messy genome. Notably, in cases of subclonal copy number variation, not all peaks in the density histogram correspond to integer copy number states. In these cases, it is challenging to estimate the depth difference between different integer copy number states. To illustrate this, here's another metastatic tumour, however this one contains subclonal copy number variation, and we'll go through Ploidetect's process to explain how it manages to determine the purity of this biopsy.
 
@@ -213,7 +213,7 @@ nomaf = F
 
 Note that you won't be able to call these functions yourself as they aren't exported by the namespace of the package.
 
-First, we call ploidetect_preprocess, which performs basic preprocessing of the data. It corrects for lingering GC biases using a loess fit and also corrects the read depth using the normal read depth, since using constant depth bins can fail at the terminal end of the chromsome due to being truncated by the end of the chromosome. We get three objects, one of which is important for our sake.
+First, we call ploidetect_preprocess, which performs basic preprocessing of the data. First, Ploidetect converts combines sequential bins into ~100kb sized new bins for more accurate modeling. It corrects for lingering GC biases using a loess fit and also corrects the read depth using the normal read depth, since using constant depth bins can fail at the terminal end of the chromsome due to being truncated by the end of the chromosome. We get three objects, one of which is important for our sake.
 
 ```{r}
 preprocess_output <- ploidetect_preprocess(all_data = all_data)
@@ -233,19 +233,34 @@ filtered contains the corrected and filtered read depths for our data. Let's com
 
 
 ```{r}
-filtered %>% filter (y_raw < 50000) %>% ggplot(aes(x = size)) + geom_point(aes(y = y_raw), alpha = 0.05, size = 0.1)
-filtered %>% filter (y_raw < 50000) %>% ggplot(aes(x = size)) + geom_point(aes(y = residual), alpha = 0.05, size = 0.1)
+filtered %>% filter (y_raw < 200000) %>% ggplot(aes(x = size)) + geom_point(aes(y = y_raw), alpha = 0.05, size = 0.1)
+filtered %>% filter (y_raw < 200000) %>% ggplot(aes(x = size)) + geom_point(aes(y = residual), alpha = 0.05, size = 0.1)
 ```
-
-It's not much, but we have reduced the variation in the read depth data somewhat. If you were wondering, highoutliers contains exceptionally high depth outliers that are either caused by sequencing error or other causes, and we exclude these bins to limit their interference on the modeling. maxpeak is the most common read depth that we observe in the data.
-
 
 Ploidetect uses a kernel density estimation to find peaks in the depth histogram. We use a simple heuristic to get a decent bandwidth for peak calling.
 
+```{r}
+bw = maxpeak/40
+```
+
+It's not much. In some cases, this step can be extremely helpful in reducing the mapping biases in the data. Ploidetect does a quick check to see if this step manages to actually reduce the variability. The idea behind this is that the worse data will have points far more spread out, resuting in a higher average normalized density
+
 
 ```{r}
-bw = maxpeak/80
+## Compute density for mapping-corrected data
+den <- density(filtered$residual, n = nrow(filtered), bw = bw)
+## Normalize the density to 0->1 range
+den$y <- (den$y - min(den$y))/(max(den$y) - min(den$y))
+## Sanity check - see if ploidetect_preprocess resulted in a worse separation of peaks than the initial data
+den2 <- density(filtered$y_raw, n = nrow(filtered), bw = bw)
+den2$y <- (den2$y - min(den2$y))/(max(den2$y) - min(den2$y))
+if(mean(den2$y) < mean(den$y)){
+  filtered$residual <- filtered$y_raw - maxpeak
+}
 ```
+
+If you were wondering, highoutliers contains exceptionally high depth outliers that are either caused by sequencing error or other causes, and we exclude these bins to limit their interference on the modeling. maxpeak is the most common read depth that we observe in the data.
+
 
 Next, we need to call peaks in the density histogram. The histogram, for reference:
 
@@ -260,28 +275,24 @@ library(kedd)
 plot(dkde(filtered$residual, deriv.order = 2, h = bw))
 ```
 
-Of course, since we used a simple heuristic for bandwidth, we should probably throw another heuristic in for good measure. What if we detect only one peak in the data? Either there is no copy number variation, or Ploidetect needs to reduce the bandwidth. So as a first pass Ploidetect filters the data relatively stringently, by using a quantile filter from the 1st to 99th percentiles of read depth and calls peaks. Don't worry too much about what all of the variables mean.
+Of course, since we used a simple heuristic for bandwidth, we should probably throw another heuristic in for good measure. What if we detect only one peak in the data? Either there is no copy number variation, or Ploidetect needs to reduce the bandwidth.
 
 ```{r}
-allPeaks <- peakcaller(filtered[findInterval(filtered$residual, vec = quantile(filtered$residual, probs = c(0.01, 0.99))) == 1,], bw)
+allPeaks <- peakcaller(filtered[findInterval(filtered$residual, vec = quantile(filtered$residual, probs = c(0, 0.999))) == 1,], bw)
 knitr::kable(allPeaks)
 ```
 
-So we've called more than one peak, we can continue with the same bandwidth, but a less stringent filter (99.9th percentile only). If Ploidetect called only one then it would try again by halving the bandwidth
+So we've called more than one peak, we can continue. If Ploidetect called only one then it would try again by halving the bandwidth and giving a warning
 
 ```{r}
 if(nrow(allPeaks) == 1){
   warning("Zero peaks detected. Attempting peak calling with lower bandwidth")
   bw = bw/2
-  allPeaks <- peakcaller(filtered[findInterval(filtered$residual, vec = quantile(filtered$residual, probs = c(0.01, 0.99))) == 1,], bw)
+  allPeaks <- peakcaller(filtered[findInterval(filtered$residual, vec = quantile(filtered$residual, probs = c(0, 0.999))) == 1,], bw)
 }
-
-## Now we peak call with a much more permissive quantile filter
-allPeaks <- peakcaller(filtered[findInterval(filtered$residual, vec = quantile(filtered$residual, probs = c(0, 0.999))) == 1,], bw)
-knitr::kable(allPeaks)
 ```
 
-So you can see the less stringent filtering resulted in another peak being called. Next we do a bit of housekeeping and center the positions and read depths around zero
+Next we do a bit of housekeeping and center the positions and read depths of the peaks around zero
 
 ```{r}
 filtered$residual <- filtered$residual - allPeaks$pos[1]
@@ -296,7 +307,7 @@ next we need to do a bit of work with the allele frequency data. Specifically, w
 output <- ploidetect_processallpeaks(filtered, allPeaks)
 filtered <- output$filtered
 allPeaks <- output$allPeaks
-filtered %>% ggplot(aes(x = size, y = residual, color = peak)) + geom_point(size = 0.1, alpha = 0.1) + scale_color_viridis()
+filtered %>% ggplot(aes(x = size, y = residual, color = peak)) + geom_point(size = 0.1, alpha = 0.1) + scale_color_viridis(discrete = F)
 ```
 
 This is where Ploidetect presents you with its first plot:
@@ -317,7 +328,7 @@ plot <- ggplot(data = filteredforplot, mapping = aes_string(x = "size", y = "res
 plot
 ```
 
-And now it generates the density plot, which also illustrates the peaks that have been called in this density histogram
+And now it generates the density plot, which also illustrates the peaks that have been called in the density histogram
 
 ```{r}
 den <- density(filteredforplot$residual, bw = bw)
@@ -365,7 +376,7 @@ The difference in coverage between peaks 1 and 2:
 allPeaks$diff[which(allPeaks$npeak == 2)]
 ```
 
-If we move left and right in steps of 3730 reads, we would notice that we land very close to peak 1, peak 6, peak 7, and peak 9:
+If we move left and right in steps of `r allPeaks$diff[which(allPeaks$npeak == 2)]` reads, we would notice that we land very close to peak 1, peak 6, peak 7, and peak 9:
 
 ```{r}
 diffvalue <- allPeaks$diff[which(allPeaks$npeak == 2)]
@@ -387,7 +398,7 @@ plot
 
 This model was generated by selecting peak 2 as the comparator, and assuming a copy number difference between peak 1 and 2 of one. This model has matched with peaks 1, 2, 4, 6, 7, and 9.
 
-Alternatively, we might assume that peak 2 is two copies away from peak 1, in which case we would move left and right in steps of 1865 reads.
+Alternatively, we might assume that peak 2 is two copies away from peak 1, in which case we would move left and right in steps of 9340 reads.
 
 ```{r}
 diffvalue <- allPeaks$diff[which(allPeaks$npeak == 2)]/2
@@ -414,7 +425,7 @@ ploidetect_roughmodels will do this for each peak, as well as a variety of copy 
 
 ```{r}
 xdists <- ploidetect_roughmodels(allPeaks = allPeaks, maxpeak, verbose = verbose, rerun = rerun)
-str(xdists)
+knitr::kable(xdists)
 ```
 
 You can ignore the "mean_err" variable here. Each row of the xdists object describes a model, such as the ones above, that Ploidetect has fit to the data. The unmatched variable is a list of the peaks that were not matched by the model, and the predunmatched variable lists the positions of peaks that were predicted to occur but were not detected. This information is used as input to modelbuilder_iterative(), which is a fairly verbose function that takes this information and selects a model that balances fitting a maximum number of peaks, predicting few imaginary peaks and minimizing the difference between predicted and observed allele frequencies using a dirty heuristic algorithm. 
@@ -454,23 +465,24 @@ subclonalcalls$plots[1:2]
 The next plots will illustrate the models that Ploidetect used for each of the purity predictions
 
 ```{r}
-subclonalcalls$plots[c(3, 5)]
+subclonalcalls$plots[c(3, 4)]
 ```
 
 So let's say that the other model looks more correct for whatever reason. We can force Ploidetect to pick this model, using the information in the table or the plot (note the CN_diff and comparator values):
 
 ```{r}
-newsubclonalcalls <- ploidetect(clonalcase, cndiff = 4, comp = 9, lowest = 0)
+newsubclonalcalls <- ploidetect(clonalcase, cndiff = 3, comp = 8, lowest = 0)
 newsubclonalcalls$TC_calls %>% knitr::kable()
 newsubclonalcalls$plots[3]
 ```
 
-These features (and indeed, this tutorial) is there for the inevitable cases where Ploidetect gets it wrong. The way we could tell for this case is by looking at peak 5; it has an allele frequency of 0.517. If it were an integer copy number, it would have five copies.
+These features (and indeed, this tutorial) is there for the inevitable cases where Ploidetect gets it wrong. It isn't helpful here, but Ploidetect includes a helpful function for testing allele frequency values at specific copy numbers and tumour purities. Here we'll demonstrate why things can get a bit unclear sometimes by comparing predicted allele frequency values at the top two tumour purities. First, the predicteds for Peak #2 under the two models:
 
 ```{r}
-testMAF(CN = 5, tp = 0.24)
+testMAF(CN = 1, tp = 0.39)
+testMAF(CN = 3, tp = 0.24)
 ```
 
-We expect a MAF of 0.544 for this, but we see nearly 0.5. Not good!
+#We expect a MAF of 0.544 for this, but we see nearly 0.5. Not good!
 
 Furthermore, the pattern that we see is usually not represented in a tumour without subclonal copy number variation. Nearly always, the -1 and +1 copy number peaks (with respect to the largest one) aren't smaller than the -2 or +2. When you see this pattern you might want to take a closer look.
