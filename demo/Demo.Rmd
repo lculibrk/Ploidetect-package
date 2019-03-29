@@ -27,7 +27,7 @@ str(dat)
 
 Now we run Ploidetect by calling ```ploidetect()```, and supplying the indices for the columns in our data.
 
-```{r, echo=FALSE}
+```{r}
 result <- ploidetect(all_data = dat, normal = 2, tumour = 1, avg_allele_freq = 3, window_id = 4, window_size = 5, GC = 6, verbose = F, CNA_call = F)
 ```
 
@@ -480,9 +480,67 @@ These features (and indeed, this tutorial) is there for the inevitable cases whe
 
 ```{r}
 testMAF(CN = 1, tp = 0.39)
-testMAF(CN = 3, tp = 0.24)
+testMAF(CN = 2, tp = 0.24)
 ```
 
-#We expect a MAF of 0.544 for this, but we see nearly 0.5. Not good!
+We notice that a diploid genome would predict an allele frequency of 0.62 for peak 2, however a tetraploid model would also predict a similar allele frequency. Which one is correct?
 
-Furthermore, the pattern that we see is usually not represented in a tumour without subclonal copy number variation. Nearly always, the -1 and +1 copy number peaks (with respect to the largest one) aren't smaller than the -2 or +2. When you see this pattern you might want to take a closer look.
+This is an example of the [identifiability problem](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4103592/). Essentially both assumptions of purity and ploidy explain the data equally well. But which fit looks better? The conservative model that skips the smaller peaks immediately adjacent to peak #1 or the greedy model which fits essentially everything? In practice we tend to see that integer copy number gains and losses relative to tumour ploidy have a steadily declining quantity - that is, you would usually expect the #2 peak by height to represent a copy number difference of one. Smaller peaks falling in between, as seen in this case, generally correspond to subclones. 
+
+Now that you are familiar with the rationale behind Ploidetect, there are two more cases to go over to further illustrate the manual review process.
+
+
+```{r}
+very_crazy_case <- read.table("horrible_no_good_very_bad_data.bed", header = T, stringsAsFactors = F)
+str(very_crazy_case)
+output <- ploidetect(very_crazy_case)
+```
+
+First, the purity calls:
+
+```{r}
+output$TC_calls %>% knitr::kable()
+```
+Lots of models. Let's see the plots:
+
+```{r}
+output$plots[1:3]
+```
+
+...yuck. This is an example of when things have gone quite wrong at some stage. Most likely this is the result of sequencing error, a high degree of subclonal copy number variation, or both. 
+
+Basically cases that look like this can't be trusted to be called correctly. It might be, but it's quite likely that it isn't. As a start, we can eliminate a bunch of possibilities based on the allele frequencies. The top peak has allele frequency of 0.825 - quite high. The top model claims that this is four-copy.
+
+```{r}
+testMAF(4, 0.53)
+```
+
+So this is possible, but it would require four-copy homozygosity. This seems fairly extreme. We can next test the two-copy, 57% or 60% model:
+
+```{r}
+testMAF(2, 0.57)
+testMAF(2, 0.6)
+```
+
+Also not the best, although 60% is fairly close. Let's check out how that fit looks:
+
+```{r}
+output$plots[8]
+```
+
+This model assumes that CN = 1 has allele frequency 0.752 and CN = 3 has allele frequency of 0.63. Let's test:
+
+```{r}
+testMAF(CN = 1, 0.60)
+testMAF(CN = 3, 0.60)
+```
+
+It looks like the 60% purity model predicts allele frequencies slightly lower than what we observe - indicating that this tumour is slightly above 60% purity. However, this trend is consistent. The model is likely correct, but inaccuracies in fitting the model resulted in an inaccurate estimation of purity. 
+
+```{r}
+testMAF(CN = 1, 0.67)
+```
+
+The error in the estimate is about 7%. In practice this is probably the worst case example for Ploidetect's accuracy, although 7% isn't likely to severely affect downstream variant calling.
+
+One last example, just to drill in these points a bit further.
