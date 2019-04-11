@@ -1,6 +1,6 @@
 compressdata <- function(t, x, segmentation_threshold = segmentation_threshold){
-  # Arrange data by position
-  t <- t %>% arrange(pos)
+  # Arrange data by position and remove tibble-ness
+  t <- t %>% arrange(pos) %>% as.data.frame()
   # If this is the first iteration, set npoints to one (npoints records how many original vertices were compressed into one vertex)
   if(is.null(t$npoints)){
     t$npoints <- 1
@@ -19,7 +19,16 @@ compressdata <- function(t, x, segmentation_threshold = segmentation_threshold){
   # Holdover
   toy <- graph
   # loop over all vertices
-  for(vertex in V(toy)){
+  sort_by_diff <- data.frame("vertex" = V(toy)$name)
+  sort_by_diff$diff <- 0
+  for(row in 1:nrow(sort_by_diff)){
+    sort_by_diff$diff[row] <- max(edge_attr(toy, "diff", incident(toy, sort_by_diff$vertex[row])))
+  }
+  sort_by_diff <- sort_by_diff %>% arrange(diff)
+  for(vertex in sort_by_diff$vertex){
+    if(length(incident(toy, vertex)) == 0){
+      next
+    }
     # If vertex is an outlier (diffs are over some threshold fraction of what we expect for a copy change) then break all edges
     if(all(edge_attr(toy, "diff", incident(toy, vertex)) > segmentation_threshold*x)){
       toy <- delete_edges(toy, incident(toy, vertex))
@@ -30,6 +39,8 @@ compressdata <- function(t, x, segmentation_threshold = segmentation_threshold){
       toy <- delete_edges(toy, incident(toy, vertex)[which.max(get.edge.attribute(toy, "diff", incident(toy, vertex)))])
     }
   }
+  #print(get.vertex.attribute(toy, "npoints", V(toy)))
+  #print(toy)
   # Get list of all vertex pairs to merge
   tomerge <- ends(toy, E(toy))
   # Get all vertices
@@ -55,8 +66,7 @@ compressdata <- function(t, x, segmentation_threshold = segmentation_threshold){
   }
   
   # Merge connected vertices
-  ### This is where the memory corruption usually happens
-  toy <- contract.vertices(toy, mapping = vertices, vertex.attr.comb = list("residual" = "sum", "npoints" = "sum", "from" = "min", "to" = "max", "first")) %>% simplify()
+  toy <- contract.vertices(toy, mapping = vertices, vertex.attr.comb = list("residual" = "sum", "npoints" = "sum", "from" = "min", "to" = "max", "name" = "first"))
   # Delete all old vertices
   #toy <- delete.vertices(toy, which(names(V(toy)) == "character(0)"))
   # Reconstruct the data.frame we began with
@@ -64,6 +74,10 @@ compressdata <- function(t, x, segmentation_threshold = segmentation_threshold){
                     "npoints" = get.vertex.attribute(toy, "npoints"), 
                     "pos" = get.vertex.attribute(toy, "from"),
                     "end" = get.vertex.attribute(toy, "to"))
-  
+  #print(dat[which(dat$npoints == 1),])
+  if(T){
+    print(paste0("Iteration complete, segment count = ", nrow(dat)))
+  }
+  #print(dat)
   return(dat)
 }

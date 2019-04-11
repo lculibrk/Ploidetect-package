@@ -1,33 +1,65 @@
 #' @export
 ploidetect <- function(all_data, normal = 2, tumour = 1, avg_allele_freq = 3, window_id = 4, window_size=5, GC = 6, plots = F, verbose = F, nomaf = F, lowest = NA, runCNAs = F, comp=NA, cndiff=NA, segmentation_threshold = 0.75, CNA_call = F, debugPlots = F){
-
+  ## Initialize plots object
   plots <- list()
+  
+  ## Simplify_size
+  simplify_size = 100000
+  
+  ## Load centromeres
+  centromeres <- centromeres
+  
   ## Run ploidetect_preprocess
 
-  output <- ploidetect_preprocess(all_data = all_data, verbose = verbose, debugPlots = debugPlots, tumour = tumour, normal = normal, avg_allele_freq = avg_allele_freq, window_id = window_id, window_size = window_size, GC = GC)
-  
+  output <- ploidetect_preprocess(all_data = all_data, verbose = verbose, debugPlots = debugPlots, tumour = tumour, normal = normal, avg_allele_freq = avg_allele_freq, window_id = window_id, window_size = window_size, GC = GC, simplify = T, simplify_size = simplify_size)
+
   ## Unpack the output list from ploidetect_preprocess
   maxpeak <- output$maxpeak
   filtered <- output$x
   highoutliers <- output$highoutliers
+  unaltered <- output$merged
   
-  bw = maxpeak/80
+  bw = maxpeak/40
   
-  ## Perform peak calling with a heavily filtered "filtered" object to see how many we call:
-  allPeaks <- peakcaller(filtered[findInterval(filtered$residual, vec = quantile(filtered$residual, probs = c(0, 0.999))) == 1,], bw)
+  den <- density(filtered$residual, n = nrow(filtered), bw = bw)
+  ## Normalize the density to 0->1 range
+  den$y <- (den$y - min(den$y))/(max(den$y) - min(den$y))
+  
+  ## Sanity check - see if ploidetect_preprocess resulted in a worse separation of peaks than the initial data
+  
+  den2 <- density(filtered$y_raw, n = nrow(filtered), bw = bw)
+  den2$y <- (den2$y - min(den2$y))/(max(den2$y) - min(den2$y))
+  
+  #den3 <- density(filtered$fan_correction, n = nrow(filtered), bw = bw)
+  #den3$y <- (den3$y - min(den3$y))/(max(den3$y) - min(den3$y))
+  
+  ## If ploidetect_preprocess made things worse, then revert to raw input data
+  
+  decision <- which.min(c(mean(den$y), mean(den2$y)))#, mean(den3$y)))
+  
+  if(decision != 1){
+    if(decision == 2){
+      filtered$residual <- filtered$y_raw - maxpeak
+    }
+    #if(decision == 3){
+    #  filtered$residual <- filtered$fan_correction
+    #}
+    if(verbose){
+    }
+  }
+  
+  
+  
+  ## Perform peak calling
+  allPeaks <- peakcaller(filtered[findInterval(filtered$residual, vec = quantile(filtered$residual, probs = c(0, 0.999))) == 1,], bw, maxpeak = maxpeak)
   
   ## If we call zero peaks (due to poor bw, for example), try with half bandwidth and throw a warning
   if(nrow(allPeaks) == 1){
     warning("Zero peaks detected. Attempting peak calling with lower bandwidth")
     bw = bw/2
-    allPeaks <- peakcaller(filtered[findInterval(filtered$residual, vec = quantile(filtered$residual, probs = c(0, 0.999))) == 1,], bw)
+    allPeaks <- peakcaller(filtered[findInterval(filtered$residual, vec = quantile(filtered$residual, probs = c(0, 0.999))) == 1,], bw, maxpeak = maxpeak)
   }
-  
-  ## Center the residual and peak data about the tallest peak
-  filtered$residual <- filtered$residual - allPeaks$pos[1]
-  allPeaks$start <- allPeaks$start - allPeaks$pos[1]
-  allPeaks$end <- allPeaks$end - allPeaks$pos[1]
-  allPeaks$pos <- allPeaks$pos - allPeaks$pos[1]
+
   
   ## Run processallpeaks
   output <- ploidetect_processallpeaks(filtered, allPeaks)
@@ -52,7 +84,7 @@ ploidetect <- function(all_data, normal = 2, tumour = 1, avg_allele_freq = 3, wi
     #scale_x_continuous(limits = quantile(filtered$size, probs = c(0.05, 0.99))) +
     theme_bw(base_size = 12)
   plots <- c(plots, list(plot))
-  den <- density(filteredforplot$residual, bw = bw)
+  den <- density(filteredforplot$residual, n = nrow(filteredforplot), bw = bw)
   dendf <- data.frame(x = den$x, y = den$y)
   # Normalize the density to 0->1 range and plot
   dendf$y <- (dendf$y - min(dendf$y))/(max(dendf$y) - min(dendf$y))
@@ -95,7 +127,7 @@ ploidetect <- function(all_data, normal = 2, tumour = 1, avg_allele_freq = 3, wi
   TC_calls <- list()
 
   for(i in 1:nrow(xdists)){
-    modelbuilder_output <- modelbuilder_iterative(xdists[i,], allPeaks = allPeaks, lowest = lowest, filtered = filtered, strict = T, get_homd = F, mode = "TC", nomaf = nomaf, rerun = rerun, maxpeak = maxpeak, bw = bw)
+    modelbuilder_output <- modelbuilder_iterative(xdists[i,], allPeaks = allPeaks, lowest = lowest, filtered = filtered, strict = T, get_homd = F, mode = "TC", nomaf = nomaf, rerun = rerun, maxpeak = maxpeak, bw = bw, verbose = verbose)
     TC_calls <- c(TC_calls, list(modelbuilder_output$out))
     plots <- c(plots, list(modelbuilder_output$outplot))
 
@@ -145,56 +177,49 @@ ploidetect <- function(all_data, normal = 2, tumour = 1, avg_allele_freq = 3, wi
   
   depthdiff <- output$depthdiff
   
-  CN_calls <- ploidetect_segmentator(filtered, matchedPeaks, maxpeak, predictedpositions, highoutliers, depthdiff, avg_allele_freq = avg_allele_freq, window_size = window_size, window_id = window_id, tumour = tumour, segmentation_threshold = segmentation_threshold)
+  CN_calls <- ploidetect_segmentator(filtered, matchedPeaks, maxpeak, predictedpositions, highoutliers, depthdiff, avg_allele_freq = avg_allele_freq, window_size = window_size, window_id = window_id, tumour = tumour, segmentation_threshold = segmentation_threshold, verbose = verbose, GC = GC, all_data = all_data)
   
-  CN_calls <- ploidetect_loh(purity = TC_calls$tumour_purity[1], CNA_object = CN_calls)
+  new_CN_calls <- ploidetect_fineCNAs(all_data = all_data, CNAout = CN_calls, depthdiff = depthdiff, maxpeak = maxpeak, TC = TC_calls$tumour_purity[1], ploidy = TC_calls$Ploidy[1], verbose = verbose, tumour = tumour, normal = normal, avg_allele_freq = avg_allele_freq, window_id = window_id, window_size = window_size, GC = GC, decision = decision, simpsize = simplify_size, unaltered = unaltered)
+  new_CN_calls <- do.call(rbind.data.frame, new_CN_calls)
+    iters <- 2
   
-  ## 0 = HOMD, 1 = 1cp, 2 = 2cp het, 3 = 2cp HOM, 4 = 3cp het, 5 = 3cp HOM, 6 = 4cp het, 7 = 4cp HOM, 8 = 5cp+
-  CN_calls$state <- 0
+  target_iters <- ceiling(log2(simplify_size/median(all_data$size)))
   
-  for(row in 1:nrow(CN_calls)){
-    CN <- CN_calls$CN[row]
-    if(CN >= 5){
-      CN_calls$state[row] <- 8
-    }
-    if(CN == 0){
-      CN_calls$state[row] <- 0
-    }
-    if(CN == 1){
-      CN_calls$state[row] <- 1
-    }
-    if(CN == 2){
-      if(CN_calls$LOH[row]){
-        CN_calls$state[row] <- 3
-      }else{
-        CN_calls$state[row] <- 2
-      }
-    }
-    if(CN == 3){
-      if(CN_calls$LOH[row]){
-        CN_calls$state[row] <- 5
-      }else{
-        CN_calls$state[row] <- 4
-      }
-    }
-    if(CN == 4){
-      if(CN_calls$LOH[row]){
-        CN_calls$state[row] <- 7
-      }else{
-        CN_calls$state[row] <- 6
-      }
+  while(iters < target_iters){
+    initial_points <- nrow(new_CN_calls)
+    new_CN_calls <- ploidetect_fineCNAs(all_data = all_data, CNAout = new_CN_calls, depthdiff = depthdiff, maxpeak = maxpeak, TC = TC_calls$tumour_purity[1], ploidy = TC_calls$Ploidy[1], verbose = verbose, tumour = tumour, normal = normal, avg_allele_freq = avg_allele_freq, window_id = window_id, window_size = window_size, GC = GC, decision = decision, simpsize = simplify_size/(2^(iters-1)), unaltered = unaltered)
+    new_CN_calls <- do.call(rbind.data.frame, new_CN_calls)
+    print(paste0("Completed iteration ", iters))
+    iters <- iters+1
+    if(nrow(new_CN_calls) == initial_points){
+      iters <- Inf
     }
   }
-  
+  if(verbose){
+    print("Calling LOH")
+  }
+  CN_calls <- ploidetect_loh(purity = TC_calls$tumour_purity[1], CNA_object = new_CN_calls)
+  if(verbose){
+    print("Finished calling LOH")
+  }
   CN_calls$state <- factor(CN_calls$state)
   
-  CN_palette <- c("0" = "#cc0000", "1" = "#000066", "2" = "#26d953", "3" = "#609f70", "4" ="#cccc00", "5" = "#80804d", "6" = "#cc6600", "7" = "#856647", "8" = "#cc0000")
+  CN_palette <- c("0" = "#cc0000", 
+                  "1" = "#000066", 
+                  "2" = "#26d953", 
+                  "3" = "#609f70", 
+                  "4" = "#cccc00", 
+                  "5" = "#80804d",
+                  "6" = "#cc6600", 
+                  "7" = "#856647", 
+                  "8" = "#cc0000"
+                  )
   
   CN_calls <- split(CN_calls, f = CN_calls$chr)
   
   CNA_plot <- lapply(CN_calls, function(x){
     chr = x$chr[1]
-    ggplot(x, aes(x = pos, y = log(raw_residual + maxpeak), color = as.character(state))) + 
+    x %>% filter(end < centromeres$pos[which(centromeres$chr == chr)][1] | pos > centromeres$end[which(centromeres$chr == chr)][2]) %>% ggplot(aes(x = pos, y = log(raw_residual + maxpeak), color = as.character(state))) + 
       geom_point(size = 0.5) + 
       scale_color_manual(name = "State",
                          values = CN_palette, 
@@ -215,7 +240,7 @@ ploidetect <- function(all_data, normal = 2, tumour = 1, avg_allele_freq = 3, wi
   
   vaf_plot <- lapply(CN_calls, function(x){
     chr = x$chr[1]
-    ggplot(x, aes(x = pos, y = mafflipped, color = as.character(state))) + 
+    x %>% filter(end < centromeres$pos[which(centromeres$chr == chr)][1] | pos > centromeres$end[which(centromeres$chr == chr)][2]) %>% ggplot(aes(x = pos, y = mafflipped, color = as.character(state))) + 
       geom_point(size = 0.5) + 
       scale_color_manual(name = "State",
                          values = CN_palette, 

@@ -1,4 +1,4 @@
-modelbuilder_iterative <- function(xdists = xdists, allPeaks = allPeaks, lowest = NA, filtered = filtered, strict = T, get_homd = F, mode = "TC", nomaf = nomaf, rerun = rerun, maxpeak = maxpeak,bw = bw){
+modelbuilder_iterative <- function(xdists = xdists, allPeaks = allPeaks, lowest = NA, filtered = filtered, strict = T, get_homd = F, mode = "TC", nomaf = nomaf, rerun = rerun, maxpeak = maxpeak, bw = bw, verbose = verbose){
 
   out <- list()
   outplots <- list()
@@ -176,7 +176,7 @@ modelbuilder_iterative <- function(xdists = xdists, allPeaks = allPeaks, lowest 
         if(!is.na(matchedPeaks$mainmaf[j])){
           error <- c()
           err <- c()
-          mafs <- filterednomafna$mafflipped[filterednomafna$peak %in% matchedPeaks$npeak[j]]
+          mafs <- filterednomafna$maf[filterednomafna$peak %in% matchedPeaks$npeak[j]]
           # CN for testing
           CN <- matchedPeaks$CN[j]
           # For below, we essentially make a vector of all possible MAF values at each CN state given the TC
@@ -184,14 +184,17 @@ modelbuilder_iterative <- function(xdists = xdists, allPeaks = allPeaks, lowest 
           # We do this for CN 0-4, as beyond this the possibilities get numerous and doesn't really help
           if(CN == 0){
             err <- c()
-            matchedPeaks$expected[j] = 0.5
-            err <- abs(mafs - matchedPeaks$expected[j])
-            #error <- c(err, error)
+            max_error = 0.5
+            comp <- c(0.5)
+            for(g in 1:length(mafs)){
+              err[g] <- min(abs(mafs[g] - comp))
+            }
           }
           if(CN == 1){
             err <- c()
             comp <- c((0*purity + 1*impurity)/(CN*purity+2*impurity), 
                       (1*purity + 1*impurity)/(CN*purity+2*impurity))
+            matchedPeaks$expected[j] <- comp[2]
             for(g in 1:length(mafs)){
               err[g] <- min(abs(mafs[g] - comp))
             }
@@ -242,18 +245,18 @@ modelbuilder_iterative <- function(xdists = xdists, allPeaks = allPeaks, lowest 
     # Mafdev is the median difference between predicted and observed MAFs
     mafdev[paste0(lowestpeak)] <- mean(toterr)
     lowestsize <- matchedPeaks$height[1]
-    mafdeveven[paste0(lowestpeak)] <- mean(toterr)*(1+(max(ploidy-2, 0)*(1-lowestsize)))
-    #if(any(matchedPeaks$mafdeviation > 0.15)){
-    #  newerrors <- Inf
-    #  mafdev[paste0(lowestpeak)] <- Inf
-    #}
-    # If tc<1.1 or < 0 then set mafdev to Inf (this is an impossible model) (1.1 to allow slight inaccuracies)
+    # Compute maf error for diploid vs tetraploid cases
+    ## This computation is different from mafdev in that we take into account the size of the lowest peak and penalize higher ploidies unless the lowest peak is also large
+    mafdeveven[paste0(lowestpeak)] <- mean(sqrt(toterr))*(1+(max(ploidy-2, 0)*(1-lowestsize)))
+    # If we have any peaks that are severely wrong from a MAF perspective
+    if(any(matchedPeaks$mafdeviation > 0.15) & !all(matchedPeaks$mafdeviation > 0.15) & !rerun){
+      mafdev[paste0(lowestpeak)] <- Inf
+    }
+    # If tc<1.1 or < 0 then set mafdev to Inf (this is an impossible model) (1.1 to allow 100% TC samples to be called with a bit of imprecision)
     if(!is.na(purity)){
-      if(purity > 1.1 | purity < 0){
+      if((purity > 1.1 | purity < 0) & !rerun){
         mafdev[paste0(lowestpeak)] <- Inf
-        #if(rerun){
-        #  stop("You are trying to force a model which would result in TC > 110% or lower than 0%")
-        #}
+        next
       }
     }
     #if we have a case of ridiculous by-chance fit with peak skipping (< 10^-8 works well), filter out
@@ -267,7 +270,7 @@ modelbuilder_iterative <- function(xdists = xdists, allPeaks = allPeaks, lowest 
     }
     # Arrange
     matchedPeaks <- matchedPeaks %>% arrange(pos)
-    # If the biggest peak is somehow a HOMD, correct that
+    # If the biggest peak is somehow called zero-copy, correct that
     if(nrow(matchedPeaks) > 0){
       if(ploidy == 0){
         mafdev[paste0(lowestpeak)] <- Inf
@@ -286,9 +289,9 @@ modelbuilder_iterative <- function(xdists = xdists, allPeaks = allPeaks, lowest 
                                                "Comparator" = xdists$Comparator_peak_rank,
                                                "model_error" = newerrors * as.numeric(mafdev[paste0(lowestpeak)]),
                                                "avg_ploidy" = average_ploidy,
-                                               "unmatchedpct" = unmatchederror))
+                                               "unmatchedpct" = unmatchederror
+                                               ))
   }
-
   out <- do.call(rbind.data.frame, out)
   if(nrow(out) > 1){
     out <- out[-which.max(out$maf_error),]
@@ -323,7 +326,8 @@ modelbuilder_iterative <- function(xdists = xdists, allPeaks = allPeaks, lowest 
       color_frame$col[i] <- "#ED553B"
     }
   }
-  newden <- filtered$residual[which(filtered$residual < max(matchedPeaks$pos) + x)] %>% density()
+  
+  newden <- filtered$residual[which(filtered$residual < max(matchedPeaks$pos) + x)] %>% density(bw = bw)
 
   plot <- ggplot(mapping = aes(x = newden$x + maxpeak, y = (newden$y - min(newden$y))/(max(newden$y) - min(newden$y)))) + 
     geom_line() + 
@@ -334,7 +338,6 @@ modelbuilder_iterative <- function(xdists = xdists, allPeaks = allPeaks, lowest 
     geom_text(mapping = aes(x = allPeaks$pos, y = allPeaks$height + 0.05, label = paste0("MAF = ", round(allPeaks$mainmaf, digits = 3)))) +
     theme_bw(base_size = 12) + 
     scale_color_manual(values = color_frame$col, labels = paste0("CN = ", matchedPeaks$CN), name = "Absolute copy number") #+ theme(legend.position = "none")
-
   t <- list("out" = out, "outplot" = plot)
   return(list("out" = out, "outplot" = plot))
 }

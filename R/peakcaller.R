@@ -1,4 +1,4 @@
-peakcaller <- function(filtered, bw = bw, verbose = F){
+peakcaller <- function(filtered, bw = bw, verbose = F, maxpeak = maxpeak){
   if(verbose){
     print("Performing Kernel Density Estimation and Peak Calling")
   }
