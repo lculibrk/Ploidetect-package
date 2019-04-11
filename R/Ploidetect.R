@@ -1,3 +1,37 @@
+#' Runs Ploidetect on read count and allele frequency data
+#' @param all_data input data, formatted as a data.frame where each row is a genomic bin. Columns correspond to
+#' somatic read counts, normal read counts, allele frequencies, window id (in the format chr_pos), window size, and GC content
+#' @param normal column index of normal read depth
+#' @param tumour column index of tumour read depth
+#' @param avg_allele_freq column index of snp allele frequencies in the tumour
+#' @param window_id column index of window id (formatted as chr_pos)
+#' @param window_size column index for size of the genomic bin in bp
+#' @param GC column index of GC content as a percentage 
+#' @param plots Logical. should plots be output?
+#' @param verbose Logical. Print verbose messages?
+#' @param lowest Integer from 0-2. Optional. Forces the copy number identity of the lowest fit peak in the read depth KDE
+#' @param comp Integer. Forces selection of a specific comparator peak in the read depth kernel density estimate (KDE) for tumour content modeling
+#' @param cndiff Integer. Forces the copy number difference between tallest peak in read depth KDE and the peak selected in comp
+#' @param segmentation_threshold Float between 0 and 1. Threshold for segmentation of adjacent bins during copy number calling.
+#' Default is 0.75. Smaller values will produce more segments, but may result in over-segmentation of copy number data.
+#' @param CNA_call Logical. Should copy number calling be performed?
+#' @param debugplots Logical. Should plots of data normalization be output?
+#' @return A named list, containing three elements:
+#' TC_calls: A data.frame containing all models considered for modeling tumour purity and ploidy
+#' plots: a list of plots. Plot 1 is always a scatter plot where the x-axis is window size, y-axis is corrected somatic read counts, and
+#' points are colored by SNP allele frequency. Plot 2 shows the KDE of the data, with all peaks shown. Next, the models in TC_calls are plotted,
+#' one plot per model. Finally, if CNA_call was TRUE, copy number data is plotted, one plot per chromosome.
+#' CNA_calls: a data.frame containing segmented copy number and LOH calls
+#' @examples 
+#' ## Run Ploidetect without specifying a model
+#' ploidetect(all_data)
+#' ## Run Ploidetect and force a model which fits the second most common copy number as being a true integer copy number 
+#' ## with copy number equal to Ploidy +- 1, and the lowest common copy number being homozygous deletion
+#' ploidetect(all_data, comp = 2, cndiff = 1, lowest = 0)
+#' ## Run Ploidetect with the above model and also output copy number data
+#' ploidetect(all_data, comp = 2, cndiff = 1, lowest = 0, CNA_call = T)
+#' ## Run Ploidetect with a custom segmentation_threshold 
+#' ploidetect(all_data, comp = 2, cndiff = 1, lowest = 0, CNA_call = T, segmentation_threshold = 0.5)
 #' @export
 ploidetect <- function(all_data, normal = 2, tumour = 1, avg_allele_freq = 3, window_id = 4, window_size=5, GC = 6, plots = F, verbose = F, lowest = NA, comp=NA, cndiff=NA, segmentation_threshold = 0.75, CNA_call = F, debugPlots = F){
   ## Initialize plots object

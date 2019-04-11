@@ -213,7 +213,7 @@ nomaf = F
 
 Note that you won't be able to call these functions yourself as they aren't exported by the namespace of the package.
 
-First, we call ploidetect_preprocess, which performs basic preprocessing of the data. First, Ploidetect converts combines sequential bins into ~100kb sized new bins for more accurate modeling. It corrects for lingering GC biases using a loess fit and also corrects the read depth using the normal read depth, since using constant depth bins can fail at the terminal end of the chromsome due to being truncated by the end of the chromosome. We get three objects, one of which is important for our sake.
+First, we call ploidetect_preprocess, which performs basic preprocessing of the data. First, Ploidetect converts combines sequential bins into ~100kb sized new bins for more accurate modeling. It corrects for lingering GC biases using a loess fit and also corrects the read depth using the normal read depth, since using constant depth bins can fail at the terminal end of the chromsome due to being truncated by the end of the chromosome. We get four objects, one of which is important for our sake.
 
 ```{r}
 preprocess_output <- ploidetect_preprocess(all_data = all_data)
@@ -237,14 +237,16 @@ filtered %>% filter (y_raw < 200000) %>% ggplot(aes(x = size)) + geom_point(aes(
 filtered %>% filter (y_raw < 200000) %>% ggplot(aes(x = size)) + geom_point(aes(y = residual), alpha = 0.05, size = 0.1)
 ```
 
+
+It's not much. In some cases, this step can be extremely helpful in reducing the mapping biases in the data. Ploidetect does a quick check to see if this step manages to actually reduce the variability. The idea behind this is that the worse data will have points far more spread out, resuting in a higher average normalized density
+
 Ploidetect uses a kernel density estimation to find peaks in the depth histogram. We use a simple heuristic to get a decent bandwidth for peak calling.
 
 ```{r}
 bw = maxpeak/40
 ```
 
-It's not much. In some cases, this step can be extremely helpful in reducing the mapping biases in the data. Ploidetect does a quick check to see if this step manages to actually reduce the variability. The idea behind this is that the worse data will have points far more spread out, resuting in a higher average normalized density
-
+Now we perform the density estimation that the rest of the analysis is based on. Afterward, we do a quick check to ensure that the correction step actually helped in correcting biases in the depth - if it didn't, we revert back to the raw depth. 
 
 ```{r}
 ## Compute density for mapping-corrected data
