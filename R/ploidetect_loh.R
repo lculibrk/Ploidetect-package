@@ -1,12 +1,13 @@
 ploidetect_loh <- function(purity, CNA_object){
-  CNA_object <- CNA_object %>% arrange(CN)
-  CNA_object <- CNA_object %>% group_by(chr, segment) %>% dplyr::mutate("median_maf" = median(mafflipped, na.rm = T))
+  CNA_object <- CNA_object %>% arrange(CN) %>% group_by(chr, segment) %>% dplyr::mutate("median_maf" = median(mafflipped, na.rm = T))
   CNA_object_mafs <- CNA_object[which(!is.na(CNA_object$median_maf)),]
   CNA_object_nomafs <- CNA_object[which(is.na(CNA_object$median_maf)),]
-  CNA_object_nomafs$LOH <- F
+  if(nrow(CNA_object_nomafs) > 1){
+    CNA_object_nomafs$LOH <- F
+  }
+
   allCNs <- unique(CNA_object_mafs$CN)
-  allCNs <- allCNs[allCNs > 1]
-  allCNs <- allCNs[allCNs <= 8]
+  allCNs <- allCNs[allCNs > 1 & allCNs <= 8]
   maf_possibilities <- list()
   for(copynumber in allCNs){
     mafs <- testMAF(copynumber, tp = purity)
@@ -36,7 +37,11 @@ ploidetect_loh <- function(purity, CNA_object){
   }
   
   CNA_object_mafs <- left_join(CNA_object_mafs, segments[,c("chr", "segment", "LOH")], by = c("chr", "segment"))
-  CNA_object <- rbind.data.frame(CNA_object_mafs, CNA_object_nomafs) %>% arrange(chr, pos)
+  if(nrow(CNA_object_nomafs) > 0){
+    CNA_object <- rbind.data.frame(CNA_object_mafs, CNA_object_nomafs) %>% arrange(chr, pos)
+  }else{
+    CNA_object <- CNA_object_mafs %>% arrange(chr, pos)
+  }
   state_call <- CNA_object %>% ungroup %>% group_by(chr, segment) %>% summarise(CN = first(CN), LOH = first(LOH))
   ## Assign HMM-like states to CN/LOH combinations
   state_call$state <- 0

@@ -213,13 +213,22 @@ ploidetect <- function(all_data, normal = 2, tumour = 1, avg_allele_freq = 3, wi
   
   CN_calls <- ploidetect_segmentator(filtered, matchedPeaks, maxpeak, predictedpositions, highoutliers, depthdiff, avg_allele_freq = avg_allele_freq, window_size = window_size, window_id = window_id, tumour = tumour, segmentation_threshold = segmentation_threshold, verbose = verbose, GC = GC, all_data = all_data)
   
+  #CN_calls %>% filter(chr == 20) %>%  ggplot(aes(x = pos,  y = raw_residual, color = segment)) + geom_point() + scale_color_viridis()
+  
   new_CN_calls <- ploidetect_fineCNAs(all_data = all_data, CNAout = CN_calls, depthdiff = depthdiff, maxpeak = maxpeak, TC = TC_calls$tumour_purity[1], ploidy = TC_calls$Ploidy[1], verbose = verbose, tumour = tumour, normal = normal, avg_allele_freq = avg_allele_freq, window_id = window_id, window_size = window_size, GC = GC, decision = decision, simpsize = simplify_size, unaltered = unaltered)
+  
+  
   new_CN_calls <- do.call(rbind.data.frame, new_CN_calls)
-    iters <- 2
+  
+  
+  #new_CN_calls %>% ungroup %>%  filter(chr == 11, CN < 10) %>%  ggplot(aes(x = pos,  y = raw_residual, color = CN)) + geom_point() + scale_color_viridis()
+
+
+  iters <- 2
   
   target_iters <- ceiling(log2(simplify_size/median(all_data$size)))
-  
-  while(iters < target_iters){
+  #new_CN_calls %>% ungroup %>%  filter(chr == "17", CN < 10) %>%  ggplot(aes(x = pos, y = raw_residual, color = CN)) + geom_point() + scale_color_viridis()
+  while(iters < (target_iters)){
     initial_points <- nrow(new_CN_calls)
     new_CN_calls <- ploidetect_fineCNAs(all_data = all_data, CNAout = new_CN_calls, depthdiff = depthdiff, maxpeak = maxpeak, TC = TC_calls$tumour_purity[1], ploidy = TC_calls$Ploidy[1], verbose = verbose, tumour = tumour, normal = normal, avg_allele_freq = avg_allele_freq, window_id = window_id, window_size = window_size, GC = GC, decision = decision, simpsize = simplify_size/(2^(iters-1)), unaltered = unaltered)
     new_CN_calls <- do.call(rbind.data.frame, new_CN_calls)
@@ -253,7 +262,7 @@ ploidetect <- function(all_data, normal = 2, tumour = 1, avg_allele_freq = 3, wi
   
   CNA_plot <- lapply(CN_calls, function(x){
     chr = x$chr[1]
-    x %>% filter(end < centromeres$pos[which(centromeres$chr == chr)][1] | pos > centromeres$end[which(centromeres$chr == chr)][2]) %>% ggplot(aes(x = pos, y = log(raw_residual + maxpeak), color = as.character(state))) + 
+    x %>% filter(end < centromeres$pos[which(centromeres$chr %in% chr)[1]] | pos > centromeres$end[which(centromeres$chr %in% chr)[2]]) %>% ggplot(aes(x = pos, y = log(raw_residual + maxpeak), color = as.character(state))) + 
       geom_point(size = 0.5) + 
       scale_color_manual(name = "State",
                          values = CN_palette, 
@@ -274,7 +283,7 @@ ploidetect <- function(all_data, normal = 2, tumour = 1, avg_allele_freq = 3, wi
   
   vaf_plot <- lapply(CN_calls, function(x){
     chr = x$chr[1]
-    x %>% filter(end < centromeres$pos[which(centromeres$chr == chr)][1] | pos > centromeres$end[which(centromeres$chr == chr)][2]) %>% ggplot(aes(x = pos, y = mafflipped, color = as.character(state))) + 
+    x %>% filter(end < centromeres$pos[which(centromeres$chr %in% chr)][1] | pos > centromeres$end[which(centromeres$chr %in% chr)][2]) %>% filter(!is.na(mafflipped)) %>% ggplot(aes(x = pos, y = mafflipped, color = as.character(state))) + 
       geom_point(size = 0.5) + 
       scale_color_manual(name = "State",
                          values = CN_palette, 

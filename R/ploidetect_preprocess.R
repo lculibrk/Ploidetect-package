@@ -7,6 +7,9 @@ ploidetect_preprocess <- function(all_data, normal = 2, tumour = 1, avg_allele_f
   # Load data
   x <- as.data.frame(all_data)
   
+  # Process centromere data
+  #centromeres_preprocess <- centromeres %>% group_by(chr) %>% summarise(pos = first(pos), end = last(end))
+  
   
   # Test if data is configured and input properly
   if(!all(is.numeric(x[,normal]))){
@@ -53,7 +56,7 @@ ploidetect_preprocess <- function(all_data, normal = 2, tumour = 1, avg_allele_f
   x <- x[,c(tumour, normal, avg_allele_freq, window_id, window_size, GC, 7, 8)]
   
   names(x) <- c("tumour", "normal", "maf", "wind", "size", "gc", "merge", "chr")
-  x <- x %>% group_by(merge, chr) %>% summarise(tumour = sum(tumour), normal = sum(normal), maf = merge_mafs(maf, na.rm = T), wind = first(wind), size = sum(size), gc = mean(gc))
+  x <- x %>% group_by(merge, chr) %>% summarise(tumour = sum(tumour), normal = sum(normal), maf = merge_mafs(maf, na.rm = T), wind = dplyr::first(wind), size = sum(size), gc = mean(gc))
   ## Measure the read depth at the highest density of read coverage
   maxpeak <- density(x$tumour, n = nrow(x))$x[which.max(density(x$tumour, n = nrow(x))$y)]
   
@@ -85,7 +88,7 @@ ploidetect_preprocess <- function(all_data, normal = 2, tumour = 1, avg_allele_f
   max <- range(rangedf$tumour)[2] + range
   min <- 0
   
-  ## Set outliers aside for later steps (these will be CNA called later, but are exempt from preprocessing steps)
+  ## Set outliers aside for later steps (these will be CNA called later, but are exempt from TC/Ploidy analysis)
   highoutliers <- x[findInterval(x$tumour, c(min, max)) > 1,]
   
   ## Filter data for everything within the read depth range
@@ -108,7 +111,7 @@ ploidetect_preprocess <- function(all_data, normal = 2, tumour = 1, avg_allele_f
   }
 
   ## This is a very broad-strokes filtering step for window size. Basically removing extreme outliers w.r.t germline mappability, as we don't want to use these in modeling
-  x <- x[(x$size > (median(x$size)/10)) & (x$size < (median(x$size)*5)),]
+  #x <- x[(x$size > (median(x$size)/10)) & (x$size < (median(x$size)*5)),]
   
   
   #x <- x[,c(tumour, normal, window_id, avg_allele_freq, window_size, GC)]
@@ -119,7 +122,13 @@ ploidetect_preprocess <- function(all_data, normal = 2, tumour = 1, avg_allele_f
   names(x) <- c("y_raw", "x_raw", "maf", "window", "size", "GC")
   
   if(debugPlots){
-    rawPlot <- x %>% ggplot(aes(x = size, y = y_raw)) + geom_point(size = 0.1, alpha = 0.1) + xlab("Window size") + ylab("Tumour Read counts") + ggtitle("Raw counts by window size") + theme_minimal()
+    rawPlot <- x %>% ggplot(aes(x = size, y = y_raw)) + geom_point(size = 0.1, alpha = 0.1) + xlab("Window size") + ylab("Tumour Read counts") + ggtitle("Raw counts by window size") + theme_minimal() + 
+      theme(
+        plot.title = element_text(size = 20),
+        plot.caption = element_text(size = 15),
+        axis.title = element_text(size = 15),
+        axis.text = element_text(size = 15)
+      )
     print(rawPlot)
   }
   
@@ -127,7 +136,13 @@ ploidetect_preprocess <- function(all_data, normal = 2, tumour = 1, avg_allele_f
   
   
   if(debugPlots){
-    GCplot <- ggplot(x, aes(x = GC * 100, y = y_raw)) + geom_point(size = 0.3, alpha = 0.2) + theme_bw() + xlab("GC Content %") + ylab("Tumour Read Counts") + ggtitle("Read count and GC content relationship")
+    GCplot <- ggplot(x, aes(x = GC * 100, y = y_raw)) + geom_point(size = 0.3, alpha = 0.2) + theme_bw() + xlab("GC Content %") + ylab("Tumour Read Counts") + ggtitle("Read count and GC content relationship") + 
+      theme(
+        plot.title = element_text(size = 20),
+        plot.caption = element_text(size = 15),
+        axis.title = element_text(size = 15),
+        axis.text = element_text(size = 15)
+      )
     print(GCplot)  
   }
   
@@ -143,7 +158,13 @@ ploidetect_preprocess <- function(all_data, normal = 2, tumour = 1, avg_allele_f
       theme_bw() + 
       xlab("Window size") + 
       ylab("Normalized tumour read counts") + 
-      ggtitle("Non-linear normalization of read counts by GC content")
+      ggtitle("Non-linear normalization of read counts by GC content") + 
+      theme(
+        plot.title = element_text(size = 20),
+        plot.caption = element_text(size = 15),
+        axis.title = element_text(size = 15),
+        axis.text = element_text(size = 15)
+      )
     print(GCnormplot)
   }
   

@@ -18,3 +18,4 @@ runiterativecompression <- function(t, x, segmentation_threshold = segmentation_
   t$segment <- findInterval(t$pos, vec = compress$pos)
   return(t)
 }
+
