@@ -111,7 +111,7 @@ ploidetect_preprocess <- function(all_data, normal = 2, tumour = 1, avg_allele_f
   }
 
   ## This is a very broad-strokes filtering step for window size. Basically removing extreme outliers w.r.t germline mappability, as we don't want to use these in modeling
-  #x <- x[(x$size > (median(x$size)/10)) & (x$size < (median(x$size)*5)),]
+  x <- x[(x$size > (median(x$size)/10)) & (x$size < (median(x$size)*5)),]
   
   
   #x <- x[,c(tumour, normal, window_id, avg_allele_freq, window_size, GC)]
