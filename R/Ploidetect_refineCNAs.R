@@ -21,22 +21,22 @@ ploidetect_fineCNAs <- function(all_data, CNAout, TC, ploidy, depthdiff = depthd
   #print(predictedpositions)
   
   ## Continue unpacking data
-  unmerged_highoutliers <- unmerged_data$highoutliers
+  unmerged_highoutliers <- unmerged_data$highoutliers %>% rename("y_raw" = "tumour", "x_raw" = "normal") %>% mutate("residual" = y_raw, "normalized_size" = window_size)
   unmerged_data <- unmerged_data$x
   if(decision == 2){
     unmerged_data$residual <- unmerged_data$y_raw - unmerged_maxpeak
   }
   
   ## Sanitise highoutliers and merge with rest of data
-  unmerged_highoutliers <- unmerged_highoutliers[,c("tumour", "normal", "maf", "wind", "size", "gc", "tumour", "size")]
-  names(unmerged_highoutliers) <- names(unmerged_data)
+  #unmerged_highoutliers <- unmerged_highoutliers[,c("tumour", "normal", "maf", "wind", "size", "gc", "tumour", "size")]
+  #names(unmerged_highoutliers) <- names(unmerged_data$x)
   unmerged_data$residual <- unmerged_data$residual + unmerged_maxpeak
   unmerged_data <- rbind.data.frame(unmerged_data, unmerged_highoutliers)
   
   ## Compute the positional columns (chr, pos, end) for each window
-  unmerged_data$chr <- gsub("_.*", "", unmerged_data$window)
-  unmerged_data$pos <- as.numeric(gsub(".*_", "", unmerged_data$window))
-  unmerged_data$end <- unmerged_data$pos + unmerged_data$size
+  #unmerged_data$chr <- gsub("_.*", "", unmerged_data$window)
+  #unmerged_data$pos <- as.numeric(gsub(".*_", "", unmerged_data$window))
+  #unmerged_data$end <- unmerged_data$pos + unmerged_data$size
   unmerged_data <- unmerged_data %>% arrange(chr, pos)
   
   
@@ -51,7 +51,7 @@ ploidetect_fineCNAs <- function(all_data, CNAout, TC, ploidy, depthdiff = depthd
   for(chr in names(unmerged_data)){
     unmerged_chr <- unmerged_data[[chr]] %>% arrange(pos)
     merged_chr <- merged_data[[chr]]
-    merged_segments <- merged_chr %>% group_by(chr, segment) %>% summarise(pos = dplyr::first(pos), end = last(end), CN = mean(CN))
+    merged_segments <- merged_chr %>% group_by(chr, segment) %>% summarise(pos = dplyr::first(pos), end = last(end), CN = mean(CN)) %>% arrange(pos)
     merged_segments$pos[1] <- 0
     unmerged_chr$segment <- findInterval(unmerged_chr$pos, merged_segments$pos)
     unmerged_chr <- left_join(unmerged_chr, merged_segments[,c("segment", "CN")], by = "segment")
@@ -62,8 +62,8 @@ ploidetect_fineCNAs <- function(all_data, CNAout, TC, ploidy, depthdiff = depthd
 
   ## Compute the standard deviation of read depth in the 50% longest segments
   grouped_data <- do.call(rbind.data.frame, unmerged_data)
-  sd <- grouped_data %>% group_by(chr, segment) %>% summarise("sd" = sd(residual), "mean_residual" = mean(residual), "length" = n()) %>% ungroup %>% arrange(desc(length)) %>% slice(1:(n()/2)) %>%  summarise("medsd" = median(sd, na.rm = T)) %>% unlist
-  
+  sd <- grouped_data %>% group_by(chr, segment) %>% summarise("sd" = sd(residual), "mean_residual" = mean(residual), "length" = n()) %>% ungroup %>% arrange(desc(length)) %>% slice(n()/2) %>% summarise("medsd" = median(sd, na.rm = T)) %>% unlist
+  print(sd)
   #test_data$new_CN <- round(predict(model, data.frame("median_segment" = test_data$residual)), 0)
   #test_data$flagged <- test_data$CN != test_data$new_CN
   #test_data %>% filter(chr == 1, residual < 1e+06) %>% ggplot(aes(x = pos, y = residual, color = flagged)) + geom_point() + scale_color_viridis(discrete = T)
@@ -184,7 +184,7 @@ ploidetect_fineCNAs <- function(all_data, CNAout, TC, ploidy, depthdiff = depthd
     
     unmerged_chr <- unmerged_chr %>% group_by(segment) %>% mutate("median_segment" = median(residual), "median_maf" = median(mafflipped, na.rm = T))
     print("calling copy number")
-    unmerged_chr$CN <- round(predict(model, unmerged_chr), digits = 0)
+    unmerged_chr$CN <- round(predict(model, unmerged_chr), digits = 1)
     print("calling breakpoints")
     unmerged_chr <- callbreakpoints(unmerged_chr, predictedpositions = predictedpositions, maxpeak = unmerged_maxpeak)
     #unmerged_chr %>% filter(CN < 10) %>%  ggplot(aes(x = pos, y = residual, color = CN)) + geom_point() + scale_color_viridis(discrete = F)

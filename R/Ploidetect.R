@@ -43,6 +43,10 @@ ploidetect <- function(all_data, normal = 2, tumour = 1, avg_allele_freq = 3, wi
   ## Load centromeres
   centromeres <- centromeres
   
+  ## Add columns to input data
+  
+  names(all_data) <- c("chr", "pos", "end", "tumour", "normal", "maf", "gc")
+  
   ## Run ploidetect_preprocess
 
   output <- ploidetect_preprocess(all_data = all_data, verbose = verbose, debugPlots = debugPlots, tumour = tumour, normal = normal, avg_allele_freq = avg_allele_freq, window_id = window_id, window_size = window_size, GC = GC, simplify = T, simplify_size = simplify_size)
@@ -107,7 +111,7 @@ ploidetect <- function(all_data, normal = 2, tumour = 1, avg_allele_freq = 3, wi
   
   filteredforplot <- filtered %>% filter(residual < max(allPeaks$pos) + maxpeak)
   filteredforplot$residual <- filteredforplot$residual + maxpeak
-  plot <- ggplot(data = filteredforplot, mapping = aes_string(x = "size", y = "residual", color = "mafflipped")) + geom_point(size = 0.1, alpha = 0.1) +
+  plot <- ggplot(data = filteredforplot, mapping = aes_string(x = "window_size", y = "residual", color = "mafflipped")) + geom_point(size = 0.1, alpha = 0.1) +
     #xlab("Window size") + 
     xlab("Window size of constant-coverage bins") + 
     #ylab("Reads mapping to bins in Somatic") + 
@@ -164,26 +168,29 @@ ploidetect <- function(all_data, normal = 2, tumour = 1, avg_allele_freq = 3, wi
     modelbuilder_output <- modelbuilder_iterative(xdists[i,], allPeaks = allPeaks, lowest = lowest, filtered = filtered, strict = T, get_homd = F, mode = "TC", nomaf = nomaf, rerun = rerun, maxpeak = maxpeak, bw = bw, verbose = verbose)
     TC_calls <- c(TC_calls, list(modelbuilder_output$out))
     plots <- c(plots, list(modelbuilder_output$outplot))
-
   }
 
   #TC_calls <- lapply(xdists, function(x) modelbuilder_iterative(xdists = x, allPeaks = allPeaks, lowest = NA, filtered = filtered, strict = T, get_homd = F, mode = "TC", nomaf = nomaf, rerun = rerun, maxpeak = maxpeak, bw = bw))
 
   TC_calls <- do.call(rbind.data.frame, TC_calls)
-  
+ 
   if(nrow(TC_calls) == 0){
     TC_calls <- list()
-    plots <- list()
+    plots <- plyr::compact(plots)
     for(i in 1:nrow(xdists)){
       modelbuilder_output <- modelbuilder_iterative(xdists[i,], allPeaks = allPeaks, lowest = lowest, filtered = filtered, strict = F, get_homd = F, mode = "TC", nomaf = nomaf, rerun = rerun, maxpeak = maxpeak, bw = bw)
-
+      
       TC_calls <- c(TC_calls, list(modelbuilder_output$out))
-
+      
       plots <- c(plots, list(modelbuilder_output$outplot))
-
+      
     }
-    TC_calls <- do.call(rbind.data.frame, TC_calls)
+    TC_calls <- do.call(rbind.data.frame, TC_calls) 
   }
+  
+  TC_calls <- TC_calls %>% mutate("order" = 1:n()) %>% group_by(reads_per_copy, zero_copy_depth, Ploidy, tumour_purity) %>% summarise_all(.funs = first) %>% arrange(model_error)
+  
+  
   
   if(length(TC_calls) == 1){
     return(list("TC_calls" = TC_calls, "plots" = plots, "CN_calls" = NULL))
@@ -191,9 +198,7 @@ ploidetect <- function(all_data, normal = 2, tumour = 1, avg_allele_freq = 3, wi
   
   plots <- plyr::compact(plots)
   
-  ordering <- order(TC_calls$model_error)
-  
-  TC_calls <- TC_calls[ordering,]
+  ordering <- TC_calls$order
   
   plots <- plots[c(1, 2, ordering + 2)]
   
@@ -210,8 +215,28 @@ ploidetect <- function(all_data, normal = 2, tumour = 1, avg_allele_freq = 3, wi
   matchedPeaks = output$matchedPeaks
   
   depthdiff <- output$depthdiff
+  if(!all(allPeaks$npeak %in% matchedPeaks$npeak)){
+    subclonalpositions <- allPeaks$pos[which(!allPeaks$npeak %in% matchedPeaks$npeak)]
+    names(subclonalpositions) <- paste0(round(predict(lm(CN ~ pos, data.frame("pos" = predictedpositions, "CN" = as.numeric(names(predictedpositions)))), data.frame("pos" = subclonalpositions)), digits = 1))
+  }
   
+    
   CN_calls <- ploidetect_segmentator(filtered, matchedPeaks, maxpeak, predictedpositions, highoutliers, depthdiff, avg_allele_freq = avg_allele_freq, window_size = window_size, window_id = window_id, tumour = tumour, segmentation_threshold = segmentation_threshold, verbose = verbose, GC = GC, all_data = all_data)
+  
+  n50_segments <- function(lengths){
+    lengths=sort(lengths)
+    sumlengths=sum(as.numeric(lengths))
+    currentsum=0
+    index=1
+    while(currentsum < 0.5*sumlengths){
+      currentsum = currentsum + lengths[index]
+      index=index+1
+    }
+    return(currentsum/(index-1))
+  }
+  
+  n50_lengths <- c()
+  n50_lengths <- c(n50_lengths, CN_calls %>% group_by(chr, segment) %>% dplyr::summarise("length" = sum(end - pos)) %>% ungroup %>% dplyr::summarise("n50" = n50_segments(length)) %>% unlist())
   
   #CN_calls %>% filter(chr == 20) %>%  ggplot(aes(x = pos,  y = raw_residual, color = segment)) + geom_point() + scale_color_viridis()
   
@@ -220,27 +245,43 @@ ploidetect <- function(all_data, normal = 2, tumour = 1, avg_allele_freq = 3, wi
   
   new_CN_calls <- do.call(rbind.data.frame, new_CN_calls)
   
-  
-  #new_CN_calls %>% ungroup %>%  filter(chr == 11, CN < 10) %>%  ggplot(aes(x = pos,  y = raw_residual, color = CN)) + geom_point() + scale_color_viridis()
-
-
+  n50_lengths <- c(n50_lengths, new_CN_calls %>% group_by(chr, segment) %>% dplyr::summarise("length" = sum(end - pos)) %>% ungroup %>% dplyr::summarise("n50" = n50_segments(length)) %>% unlist())
   iters <- 2
-  
-  target_iters <- ceiling(log2(simplify_size/median(all_data$size)))
+  target_iters <- ceiling(log2(simplify_size/median(all_data$end - all_data$pos)))
   #new_CN_calls %>% ungroup %>%  filter(chr == "17", CN < 10) %>%  ggplot(aes(x = pos, y = raw_residual, color = CN)) + geom_point() + scale_color_viridis()
   while(iters < (target_iters)){
     initial_points <- nrow(new_CN_calls)
-    new_CN_calls <- ploidetect_fineCNAs(all_data = all_data, CNAout = new_CN_calls, depthdiff = depthdiff, maxpeak = maxpeak, TC = TC_calls$tumour_purity[1], ploidy = TC_calls$Ploidy[1], verbose = verbose, tumour = tumour, normal = normal, avg_allele_freq = avg_allele_freq, window_id = window_id, window_size = window_size, GC = GC, decision = decision, simpsize = simplify_size/(2^(iters-1)), unaltered = unaltered)
-    new_CN_calls <- do.call(rbind.data.frame, new_CN_calls)
-    print(paste0("Completed iteration ", iters))
+    newer_CN_calls <- ploidetect_fineCNAs(all_data = all_data, CNAout = new_CN_calls, depthdiff = depthdiff, maxpeak = maxpeak, TC = TC_calls$tumour_purity[1], ploidy = TC_calls$Ploidy[1], verbose = verbose, tumour = tumour, normal = normal, avg_allele_freq = avg_allele_freq, window_id = window_id, window_size = window_size, GC = GC, decision = decision, simpsize = simplify_size/(2^(iters-1)), unaltered = unaltered)
+    newer_CN_calls <- do.call(rbind.data.frame, newer_CN_calls)
+    n50_lengths <- c(n50_lengths, newer_CN_calls %>% group_by(chr, segment) %>% dplyr::summarise("length" = sum(end - pos)) %>% ungroup %>% dplyr::summarise("n50" = n50_segments(length)) %>% unlist())
     iters <- iters+1
     if(nrow(new_CN_calls) == initial_points){
       iters <- Inf
     }
+    if(n50_lengths[length(n50_lengths)] < n50_lengths[length(n50_lengths) - 1]/10){
+      if(verbose){
+        print(paste0("Exited segmentation early with mean bin size ", mean(newer_CN_calls$end - newer_CN_calls$pos)))
+      }
+      iters <- Inf
+    }else{
+      new_CN_calls <- newer_CN_calls
+    }
   }
+  print(n50_lengths)
+  #new_CN_calls %>% ungroup %>%  filter(chr == 11, CN < 10) %>%  ggplot(aes(x = pos,  y = raw_residual, color = CN)) + geom_point() + scale_color_viridis()
+
   if(verbose){
     print("Calling LOH")
   }
+  
+  #CN_calls$subclonal <- F
+  #if(exists("subclonalpositions")){
+  #  new_CN_calls$subclonal <- new_CN_calls$CN %in% as.numeric(names(subclonalpositions))
+  #}
+  
+  new_CN_calls$CN <- round(new_CN_calls$CN, digits = 0)
+
+  
   CN_calls <- ploidetect_loh(purity = TC_calls$tumour_purity[1], CNA_object = new_CN_calls)
   if(verbose){
     print("Finished calling LOH")
@@ -299,6 +340,7 @@ ploidetect <- function(all_data, normal = 2, tumour = 1, avg_allele_freq = 3, wi
       ylab("Major allele frequency") + 
       xlab("position") + 
       ggtitle(paste0("Chromosome ", chr, " allele frequency profile")) + 
+      scale_y_continuous(limits = c(0.5, 1)) +
       theme_bw()
   })
   

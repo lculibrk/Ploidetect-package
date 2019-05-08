@@ -6,8 +6,8 @@ ploidetect_segmentator <- function(filtered, matchedPeaks, maxpeak, predictedpos
   filtered$CN <- NA
   # Get chr and "pos" from the "window" field
 
-  filtered$chr <- gsub(pattern = "_.*", replacement = "", filtered$wind)
-  filtered$pos <- as.numeric(gsub(pattern = ".*_", replacement = "", filtered$wind))
+  #filtered$chr <- gsub(pattern = "_.*", replacement = "", filtered$wind)
+  #filtered$pos <- as.numeric(gsub(pattern = ".*_", replacement = "", filtered$wind))
   #for(window in 1:nrow(filtered)){
   #  if(!is.na(filtered$peak[window]) & filtered$peak[window] %in% matchedPeaks$npeak){
   #    filtered$CN[window] <- matchedPeaks$CN[which(matchedPeaks$npeak == filtered$peak[window])]
@@ -16,7 +16,7 @@ ploidetect_segmentator <- function(filtered, matchedPeaks, maxpeak, predictedpos
   # Filter for points with maf values
   filterednomafna <- filtered %>% filter(!is.na(mafflipped))
   # Get end value for intervals
-  filtered$end <- filtered$pos + filtered$size
+  #filtered$end <- filtered$pos + filtered$size
   # Extract relevant data for CNA calling
   data <- filtered[,c("chr", "pos", "end", "mafflipped", "residual", "CN")]
   data$residual <- data$residual + maxpeak
@@ -24,9 +24,9 @@ ploidetect_segmentator <- function(filtered, matchedPeaks, maxpeak, predictedpos
   #highoutliers <- highoutliers %>% filter(V5 > 1000)
   if(nrow(highoutliers) > 0){
     # Populate chr, pos, end fields
-    highoutliers$chr <- gsub(pattern = "_.*", replacement = "", highoutliers$wind)
-    highoutliers$pos <- as.numeric(gsub(pattern = ".*_", replacement = "", highoutliers$wind))
-    highoutliers$end <- highoutliers$pos + highoutliers$size
+    #highoutliers$chr <- gsub(pattern = "_.*", replacement = "", highoutliers$wind)
+    #highoutliers$pos <- as.numeric(gsub(pattern = ".*_", replacement = "", highoutliers$wind))
+    #highoutliers$end <- highoutliers$pos + highoutliers$size
     # Flip allele frequencies as we've done for most of the data
     highoutliers$mafflipped <- abs(highoutliers$maf - 0.5)+0.5
     # Populate the requisite fields to merge this with "data"
@@ -39,7 +39,7 @@ ploidetect_segmentator <- function(filtered, matchedPeaks, maxpeak, predictedpos
   ## Split data by chromosome
   datsplit <- split(data, data$chr)
   ## Generate model for regression-based CNA calling
-  df_train <- data.frame("CN" = as.numeric(names(predictedpositions)), "median_segment" = predictedpositions, stringsAsFactors = F)
+  df_train <- data.frame("CN" = names(predictedpositions), "median_segment" = predictedpositions, stringsAsFactors = T)
   train <- lm(CN ~ median_segment, data = df_train)
   ## Run segmentation by compression on all chromosomes
   if(verbose){
@@ -47,7 +47,7 @@ ploidetect_segmentator <- function(filtered, matchedPeaks, maxpeak, predictedpos
   }
   compressedalldat <- lapply(datsplit, runiterativecompression, x = depthdiff, segmentation_threshold = segmentation_threshold, verbose = verbose)
   
-  ## Change generate a "median_segment" column for median coverage per segment
+  ## Generate a "median_segment" column for median coverage per segment
   compressedalldat <- lapply(compressedalldat, function(x){
     x <- x %>% group_by(segment) %>% dplyr::mutate("median_segment" = median(residual), "median_maf" = median(mafflipped, na.rm = T))
   })
@@ -56,7 +56,7 @@ ploidetect_segmentator <- function(filtered, matchedPeaks, maxpeak, predictedpos
   }
   compressedalldat <- lapply(compressedalldat, function(x){
     x$median_segment <- x$median_segment
-    x$CN <- round(predict(train, x), digits = 0)
+    x$CN <- round(predict(train, x), digits = 1)
     return(x)
   })
   ## Breakpoint calling from segmentation data
