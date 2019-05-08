@@ -6,20 +6,21 @@ By Luka Culibrk at Canada's Michael Smith Genome Sciences Centre
 Ploidetect is an R package. Install Ploidetect by running ```devtools::install_github("lculibrk/Ploidetect-package")``` in R.
 
 ## Input data
-The input to Ploidetect is a tab-delimited file containing the following columns, where each column represents a genomic bin (similar to a bed file):
-* Tumour read counts in the genomic bin
-* Germline read counts in the genomic bin
-* Tumour allele frequencies of heterozygous germline SNPs
-* Window id (formatted as chromosome#_start where chromosome# is the chromosome (without "chr") and start is the start position of the genomic bin)
-* Window size (Size of the genomic bin in bp)
-* GC content of the genomic bin
+The input to Ploidetect is a tab-delimited .bed file containing the following columns in the following order, where each column represents a genomic bin:
+* chromosome without the "chr" ie. 1, 2, X
+* Start coordinate (0-based)
+* End coordinate 
+* Raw Tumour read depth (e.g. calculated by bedtools coverage or a similar tool such as hts-nim-tools) 
+* Raw normal read depth)
+* Heterozygous germline SNP allele frequencies in tumour (e.g. calculated from an mpileup or similar)
+* GC content of the genomic bin (e.g. calculated using bedtools nuc)
 
-Ploidetect requires you to supply the column indices for each of these variables, and by default they are assumed to be in the above order
+Column names are optional
 
 ## Running Ploidetect
 Ploidetect is intended to be as simple as possible to run. After loading Ploidetect with ```library(Ploidetect)```, simply load the input data file, for instance:
 
-```dat <- read.table("example.txt", sep = "\t", header = T, stringsAsFactors = F)```
+```dat <- read_ploidetect("example.txt")```
 
 and then run Ploidetect:
 
