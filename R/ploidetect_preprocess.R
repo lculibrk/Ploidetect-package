@@ -9,8 +9,10 @@ ploidetect_preprocess <- function(all_data, normal = 2, tumour = 1, avg_allele_f
   
   # Process centromere data
   centromeres_preprocess <- centromeres %>% group_by(chr) %>% summarise(pos = first(pos), end = last(end))
-  
-  
+  if(any("." %in% x$maf)){
+    x$maf[which(x$maf == ".")] <- NA
+    x$maf <- as.numeric(x$maf)
+  }
   # Test if data is configured and input properly
   if(any(grepl("chr", x$chr))){
     stop("Expected numeric chromosomes (1, 2, 3, ... X), not chr1, chr2, etc")
@@ -27,6 +29,8 @@ ploidetect_preprocess <- function(all_data, normal = 2, tumour = 1, avg_allele_f
   if(!all(is.numeric(x$gc))){
     stop("At least one element in GC-content column is not numeric")
   }
+  
+
   
   ## Step 1: Merge data such that window size is about 100Kb
   
