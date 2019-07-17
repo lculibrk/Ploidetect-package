@@ -8,11 +8,11 @@ ploidetect_preprocess <- function(all_data, normal = 2, tumour = 1, avg_allele_f
   x <- as.data.frame(all_data)
   
   # Process centromere data
-  centromeres_preprocess <- centromeres %>% group_by(chr) %>% summarise(pos = first(pos), end = last(end))
-  if(any("." %in% x$maf)){
-    x$maf[which(x$maf == ".")] <- NA
-    x$maf <- as.numeric(x$maf)
-  }
+  centromeres_preprocess <- centromeres %>% group_by(chr) %>% dplyr::summarise(pos = first(pos), end = last(end))
+  #if(any("." %in% x$maf)){
+  #  x$maf[which(x$maf == ".")] <- NA
+  #  x$maf <- as.numeric(x$maf)
+  #}
   # Test if data is configured and input properly
   if(any(grepl("chr", x$chr))){
     stop("Expected numeric chromosomes (1, 2, 3, ... X), not chr1, chr2, etc")
@@ -23,9 +23,9 @@ ploidetect_preprocess <- function(all_data, normal = 2, tumour = 1, avg_allele_f
   if(!all(is.numeric(x$tumour))){
     stop("At least one element in tumour column is not numeric.")
   }
-  if(!all(is.numeric(x$maf) | is.na(x$maf))){
-    stop("VAF column must contain only numeric or NA values")
-  }
+  #if(!all(is.numeric(x$maf) | is.na(x$maf))){
+  #  stop("VAF column must contain only numeric or NA values")
+  #}
   if(!all(is.numeric(x$gc))){
     stop("At least one element in GC-content column is not numeric")
   }
@@ -86,7 +86,7 @@ ploidetect_preprocess <- function(all_data, normal = 2, tumour = 1, avg_allele_f
   
   
   #x[,avg_allele_freq] <- as.numeric(x[,avg_allele_freq])
-  x$maf <- as.numeric(x$maf)
+  #x$maf <- as.numeric(x$maf)
   
   #x$chr <- gsub("_.*", "", x[,window_id])
   
@@ -96,7 +96,7 @@ ploidetect_preprocess <- function(all_data, normal = 2, tumour = 1, avg_allele_f
   
   #names(x) <- c("tumour", "normal", "maf", "wind", "size", "gc", "merge", "chr")
   #x <- x %>% group_by(merge, chr) %>% summarise(tumour = sum(tumour), normal = sum(normal), maf = merge_mafs(maf, na.rm = T), wind = dplyr::first(wind), size = sum(size), gc = mean(gc))
-  x <- x %>% group_by(merge, chr) %>% summarise(pos = first(pos), end = last(end), tumour = sum(tumour), normal = sum(normal), maf = merge_mafs(maf, na.rm = T), gc = mean(gc), window_size = sum(window_size))
+  x <- x %>% group_by(merge, chr) %>% dplyr::summarise(pos = first(pos), end = last(end), tumour = sum(tumour), normal = sum(normal), maf = merge_mafs(maf, na.rm = T, exp = T), gc = mean(gc), window_size = sum(window_size))
   
   ## Measure the read depth at the highest density of read coverage
   maxpeak <- density(x$tumour, n = nrow(x))$x[which.max(density(x$tumour, n = nrow(x))$y)]
@@ -161,7 +161,7 @@ ploidetect_preprocess <- function(all_data, normal = 2, tumour = 1, avg_allele_f
   #x <- x[,3:8]
   
   #names(x) <- c("y_raw", "x_raw", "maf", "window", "size", "GC")
-  x <- x %>% rename("y_raw" = "tumour", "x_raw" = "normal")
+  x <- x %>% dplyr::rename("y_raw" = "tumour", "x_raw" = "normal")
   
   if(debugPlots){
     rawPlot <- x %>% ggplot(aes(x = window_size, y = y_raw)) + geom_point(size = 0.1, alpha = 0.1) + xlab("Window size") + ylab("Tumour Read counts") + ggtitle("Raw counts by window size") + theme_minimal() + 

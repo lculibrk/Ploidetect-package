@@ -69,7 +69,6 @@ modelbuilder_iterative <- function(xdists = xdists, allPeaks = allPeaks, lowest 
       sequential[k-1] <- peakindex[k] == (peakindex[k-1] + 1)
     }
   }else{sequential <- T}
-  # Hackiest part of the program
   # If we have more ghost peaks than  half the true peaks (in #peaks > 3 cases), filter out model
   # If peak count is NOT 3 and less than half of the peaks are sequential, filter out
   if(strict & !rerun){
@@ -176,7 +175,7 @@ modelbuilder_iterative <- function(xdists = xdists, allPeaks = allPeaks, lowest 
         if(!is.na(matchedPeaks$mainmaf[j])){
           error <- c()
           err <- c()
-          mafs <- filterednomafna$maf[filterednomafna$peak %in% matchedPeaks$npeak[j]]
+          mafs <- as.numeric(unlist(unmerge_mafs(filterednomafna$maf[filterednomafna$peak %in% matchedPeaks$npeak[j]])))
           # CN for testing
           CN <- matchedPeaks$CN[j]
           # For below, we essentially make a vector of all possible MAF values at each CN state given the TC

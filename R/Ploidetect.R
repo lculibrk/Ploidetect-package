@@ -110,6 +110,7 @@ ploidetect <- function(all_data, normal = 2, tumour = 1, avg_allele_freq = 3, wi
   ## Generate coverage plots for interpretation
   
   filteredforplot <- filtered %>% filter(residual < max(allPeaks$pos) + maxpeak)
+  filteredforplot$mafflipped <- lapply(filteredforplot$mafflipped, function(x)median(unmerge_mafs(x, flip = T))) %>% unlist()
   filteredforplot$residual <- filteredforplot$residual + maxpeak
   plot <- ggplot(data = filteredforplot, mapping = aes_string(x = "window_size", y = "residual", color = "mafflipped")) + geom_point(size = 0.1, alpha = 0.1) +
     #xlab("Window size") + 
@@ -188,7 +189,7 @@ ploidetect <- function(all_data, normal = 2, tumour = 1, avg_allele_freq = 3, wi
     TC_calls <- do.call(rbind.data.frame, TC_calls) 
   }
   
-  TC_calls <- TC_calls %>% mutate("order" = 1:n()) %>% group_by(reads_per_copy, zero_copy_depth, Ploidy, tumour_purity) %>% summarise_all(.funs = first) %>% arrange(model_error)
+  TC_calls <- TC_calls %>% mutate("order" = 1:nrow(.)) %>% group_by(reads_per_copy, zero_copy_depth, Ploidy, tumour_purity) %>% dplyr::summarise_all(.funs = first) %>% arrange(model_error, maf_error)
   
   
   

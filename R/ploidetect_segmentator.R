@@ -28,7 +28,13 @@ ploidetect_segmentator <- function(filtered, matchedPeaks, maxpeak, predictedpos
     #highoutliers$pos <- as.numeric(gsub(pattern = ".*_", replacement = "", highoutliers$wind))
     #highoutliers$end <- highoutliers$pos + highoutliers$size
     # Flip allele frequencies as we've done for most of the data
-    highoutliers$mafflipped <- abs(highoutliers$maf - 0.5)+0.5
+    highoutliers_maf <- highoutliers %>% filter(!is.na(maf))
+    highoutliers_nomaf <- highoutliers %>% filter(is.na(maf))
+    highoutliers_nomaf$mafflipped <- NA
+    highoutliers_mafs <- unmerge_mafs(highoutliers_maf$maf)
+    highoutliers_mafs <- lapply(highoutliers_mafs, function(x)paste0(abs(as.numeric(x) - 0.5)+0.5, collapse = ";"))
+    highoutliers_maf$mafflipped <- unlist(highoutliers_mafs)
+    highoutliers <- rbind.data.frame(highoutliers_maf, highoutliers_nomaf) %>% arrange(chr, pos)
     # Populate the requisite fields to merge this with "data"
     highoutliers$residual <- highoutliers[,tumour] + maxpeak
     highoutliers$CN <- NA
@@ -39,7 +45,7 @@ ploidetect_segmentator <- function(filtered, matchedPeaks, maxpeak, predictedpos
   ## Split data by chromosome
   datsplit <- split(data, data$chr)
   ## Generate model for regression-based CNA calling
-  df_train <- data.frame("CN" = names(predictedpositions), "median_segment" = predictedpositions, stringsAsFactors = T)
+  df_train <- data.frame("CN" = as.numeric(names(predictedpositions)), "median_segment" = predictedpositions, stringsAsFactors = T)
   train <- lm(CN ~ median_segment, data = df_train)
   ## Run segmentation by compression on all chromosomes
   if(verbose){
@@ -49,7 +55,7 @@ ploidetect_segmentator <- function(filtered, matchedPeaks, maxpeak, predictedpos
   
   ## Generate a "median_segment" column for median coverage per segment
   compressedalldat <- lapply(compressedalldat, function(x){
-    x <- x %>% group_by(segment) %>% dplyr::mutate("median_segment" = median(residual), "median_maf" = median(mafflipped, na.rm = T))
+    x <- x %>% group_by(segment) %>% dplyr::mutate("median_segment" = median(residual), "median_maf" = merge_mafs(mafflipped, na.rm = T, flip = F, exp = T))
   })
   if(verbose){
     print("Calling copy numbers for each segment")
